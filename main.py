@@ -16,9 +16,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
-config = tf.ConfigProto()
+#config = tf.ConfigProto()
+config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
-tf.logging.set_verbosity(tf.logging.INFO)
+#tf.logging.set_verbosity(tf.logging.INFO)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 from model import UWMMSE
 
@@ -187,7 +189,8 @@ if __name__ == "__main__":
 
     rn = np.random.randint(2**20)
     rn1 = np.random.randint(2**20)
-    tf.set_random_seed(rn)
+    #tf.set_random_seed(rn)
+    tf.compat.v1.set_random_seed(rn)
     np.random.seed(rn1)
 
     mainTrain()

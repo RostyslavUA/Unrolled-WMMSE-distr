@@ -12,7 +12,7 @@ import numpy as np
 dataID = sys.argv[1]
 
 # Number of nodes
-nNodes = 20
+nNodes = 15
 
 # Path gain exponent
 pl = 2.2

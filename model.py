@@ -43,7 +43,8 @@ class UWMMSE(object):
             
             # Diag H
             dH =  tf.linalg.diag_part( self.H ) 
-            self.dH = tf.matrix_diag( dH )
+            #self.dH = tf.matrix_diag( dH )
+            self.dH = tf.compat.v1.matrix_diag(dH)
             
             # Retrieve number of nodes for initializing V
             self.nNodes = tf.shape( self.H )[-1]
@@ -58,7 +59,8 @@ class UWMMSE(object):
             
             # Iterate over layers l
             for l in range(self.layers):
-                with tf.variable_scope('Layer{}'.format(l+1)):
+                #with tf.variable_scope('Layer{}'.format(l+1)):
+                with tf.compat.v1.variable_scope('Layer{}'.format(l+1)):
                     # Compute U^l
                     U = self.U_block( V )
                     
@@ -75,7 +77,8 @@ class UWMMSE(object):
                     W = tf.math.add( tf.math.multiply( a, W_wmmse ), b )
                     
                     # Learn mu^l
-                    mu = tf.get_variable( name='mu', initializer=tf.constant(0., shape=(), dtype=tf.float64))
+                    #mu = tf.get_variable( name='mu', initializer=tf.constant(0., shape=(), dtype=tf.float64))
+                    mu = tf.compat.v1.get_variable( name='mu', initializer=tf.constant(0., shape=(), dtype=tf.float64))
 
                     # Compute V^l
                     if self.exp == 'wmmse':
@@ -91,7 +94,8 @@ class UWMMSE(object):
         
         def U_block(self, V):
             # H_ii * v_i
-            num = tf.math.multiply( tf.matrix_diag_part(self.H), V )
+            #num = tf.math.multiply( tf.matrix_diag_part(self.H), V )
+            num = tf.math.multiply( tf.compat.v1.matrix_diag_part(self.H), V )
             
             # sigma^2 + sum_j( (H_ji)^2 * (v_j)^2 )
             den = tf.reshape( tf.matmul( tf.transpose( self.Hsq, perm=[0,2,1] ), tf.reshape( tf.math.square( V ), [-1, self.nNodes, 1] ) ), [-1, self.nNodes] ) + self.var 
@@ -102,7 +106,8 @@ class UWMMSE(object):
         # Sum-rate = z
         def W_block(self, U, V):
             # 1 - u_i * H_ii * v_i
-            den = 1. - tf.math.multiply( tf.matrix_diag_part(self.H), tf.math.multiply( U, V ) )
+            #den = 1. - tf.math.multiply( tf.matrix_diag_part(self.H), tf.math.multiply( U, V ) )
+            den = 1. - tf.math.multiply( tf.compat.v1.matrix_diag_part(self.H), tf.math.multiply( U, V ) )
             
             # W = 1/den
             return( tf.math.reciprocal( den ) )
@@ -128,16 +133,22 @@ class UWMMSE(object):
             x = tf.ones([self.batch_size, self.nNodes, 1], dtype=tf.float64)
             #x = self.x
                         
-            with tf.variable_scope('gcn_'+name):
+            #with tf.variable_scope('gcn_'+name):
+            with tf.compat.v1.variable_scope('gcn_'+name):
                 for l in range(L):
-                    with tf.variable_scope('gc_l{}'.format(l+1)):
+                    #with tf.variable_scope('gc_l{}'.format(l+1)):
+                    with tf.compat.v1.variable_scope('gc_l{}'.format(l+1)):
                         # Weights
-                        w1 = tf.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w0 = tf.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        #w1 = tf.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        w1 = tf.compat.v1.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        #w0 = tf.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        w0 = tf.compat.v1.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
                         
                         ## Biases
-                        b1 = tf.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
-                        b0 = tf.get_variable( name='b0', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
+                        #b1 = tf.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
+                        b1 = tf.compat.v1.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
+                        #b0 = tf.get_variable( name='b0', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
+                        b0 = tf.compat.v1.get_variable( name='b0', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
                         
                         # XW
                         x1 = tf.matmul(x, w1)
@@ -167,7 +178,8 @@ class UWMMSE(object):
         
         def V_block(self, U, W, mu):
             # H_ii * u_i * w_i
-            num = tf.math.multiply( tf.matrix_diag_part(self.H), tf.math.multiply( U, W ) )
+            #num = tf.math.multiply( tf.matrix_diag_part(self.H), tf.math.multiply( U, W ) )
+            num = tf.math.multiply( tf.compat.v1.matrix_diag_part(self.H), tf.math.multiply( U, W ) )
             
             # mu + sum_j( (H_ij)^2 * (u_j)^2 *w_j )
             den = tf.math.add( tf.reshape( tf.matmul( self.Hsq, tf.reshape( tf.math.multiply( tf.math.square( U ), W ), [-1, self.nNodes, 1] ) ), [-1, self.nNodes] ), mu)
@@ -177,7 +189,8 @@ class UWMMSE(object):
                                                                                 
         def build_objective(self):
             # (H_ii)^2 * (v_i)^2
-            num = tf.math.multiply( tf.matrix_diag_part(self.Hsq), tf.math.square( self.pow_alloc ) )
+            #num = tf.math.multiply( tf.matrix_diag_part(self.Hsq), tf.math.square( self.pow_alloc ) )
+            num = tf.math.multiply( tf.compat.v1.matrix_diag_part(self.Hsq), tf.math.square( self.pow_alloc ) )
             
             # sigma^2 + sum_j j ~= i ( (H_ji)^2 * (v_j)^2 ) 
             den = tf.reshape( tf.matmul( tf.transpose( self.Hsq, perm=[0,2,1] ), tf.reshape( tf.math.square( self.pow_alloc ), [-1, self.nNodes, 1] ) ), [-1, self.nNodes] ) + self.var - num 
