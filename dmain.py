@@ -23,13 +23,16 @@ config.gpu_options.allow_growth = True
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 from model import UWMMSE
+from dmodel import DUWMMSE
 
 # Experiment 
-dataID = sys.argv[1]
-exp = sys.argv[2]
-if len( sys.argv ) > 3:
-    mode = sys.argv[3]
-
+#dataID = sys.argv[1]
+#exp = sys.argv[2]
+dataID = 'set0'  # TMP
+exp = 'duwmmse'  # TMP
+# if len( sys.argv ) > 3:
+#     mode = sys.argv[3]
+mode = 'train'  # TMP
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -46,8 +49,6 @@ batch_size = 64
 # Layers UWMMSE = 4 (default)  WMMSE = 100 (default)
 layers = 4 if exp == 'uwmmse' else 100
 
-optimizer = 'gd'
-
 # Learning rate
 learning_rate=1e-3
 
@@ -58,8 +59,11 @@ nEpoch = 20
 # Create Model Instance
 def create_model( session, exp='uwmmse' ):
     # Create
-    model = UWMMSE( Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers,
-                    learning_rate=learning_rate, exp=exp, optimizer=optimizer )
+    if exp=='uwmmse':
+        model = UWMMSE( Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers, learning_rate=learning_rate, exp=exp )
+    else:
+        model = DUWMMSE( Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers, learning_rate=learning_rate, exp=exp )
+
     # Initialize variables ( To train from scratch )
     session.run(tf.compat.v1.global_variables_initializer())
     
@@ -113,8 +117,8 @@ def mainTrain():
         # Unrolled WMMSE experiment
         else:
             
-            # Create model 
-            model = create_model( sess )
+            # Create model
+            model = create_model( sess, exp=exp )
 
             if mode == 'train':
                 # Create model path

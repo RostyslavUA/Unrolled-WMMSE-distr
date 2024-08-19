@@ -4,8 +4,7 @@ import tensorflow as tf
 # UWMMSE
 class UWMMSE(object):
         # Initialize
-        def __init__( self, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3,
-                      max_gradient_norm=5.0, exp='uwmmse', optimizer='adam'):
+        def __init__( self, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3, max_gradient_norm=5.0, exp='uwmmse' ):
             self.Pmax              = tf.cast( Pmax, tf.float64 )
             self.var               = var
             self.feature_dim       = feature_dim
@@ -15,7 +14,6 @@ class UWMMSE(object):
             self.max_gradient_norm = max_gradient_norm
             self.exp               = exp
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
-            self.optimizer = optimizer
             self.build_model()
 
         # Build Model
@@ -225,11 +223,8 @@ class UWMMSE(object):
             #self.opt = tf.train.GradientDescentOptimizer( learning_rate=learning_rate )
             #self.opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate_decayed, momentum=0.9, use_nesterov=True )
 
-            # Optimizer
-            if self.optimizer == 'adam':
-                self.opt = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate)
-            elif self.optimizer == 'gd':
-                self.opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+            # Adam Optimizer
+            self.opt = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate)
 
             # Compute gradients of loss w.r.t. all trainable variables
             gradients = tf.gradients(self.obj, self.trainable_params)
