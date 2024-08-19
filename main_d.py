@@ -22,17 +22,13 @@ config.gpu_options.allow_growth = True
 #tf.logging.set_verbosity(tf.logging.INFO)
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
-from model import UWMMSE
-from dmodel import DUWMMSE
-
-# Experiment 
-#dataID = sys.argv[1]
-#exp = sys.argv[2]
-dataID = 'set0'  # TMP
-exp = 'duwmmse'  # TMP
-# if len( sys.argv ) > 3:
-#     mode = sys.argv[3]
-mode = 'train'  # TMP
+from model import DUWMMSE
+# Experiment
+dataID = sys.argv[1]
+exp = sys.argv[2]
+if len( sys.argv ) > 3:
+    mode = sys.argv[3]
+mode = 'train'
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -47,7 +43,9 @@ feature_dim = 1
 batch_size = 64
 
 # Layers UWMMSE = 4 (default)  WMMSE = 100 (default)
-layers = 4 if exp == 'uwmmse' else 100
+layers = 4 if exp == 'duwmmse' else 100
+
+optimizer = 'gd'
 
 # Learning rate
 learning_rate=1e-3
@@ -57,12 +55,10 @@ nEpoch = 20
 
     
 # Create Model Instance
-def create_model( session, exp='uwmmse' ):
+def create_model( session, exp='duwmmse', nNodes=None ):
     # Create
-    if exp=='uwmmse':
-        model = UWMMSE( Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers, learning_rate=learning_rate, exp=exp )
-    else:
-        model = DUWMMSE( Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers, learning_rate=learning_rate, exp=exp )
+    model = DUWMMSE( nNodes, Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers,
+                     learning_rate=learning_rate, exp=exp, optimizer=optimizer )
 
     # Initialize variables ( To train from scratch )
     session.run(tf.compat.v1.global_variables_initializer())
@@ -76,13 +72,14 @@ def mainTrain():
     
     #Training data
     train_H = H['train_H']
+    nNodes = train_H[0].shape[-1]
     
     #Test data
     test_H = H['test_H']
     
     # Initiate TF session
     with tf.compat.v1.Session(config=config) as sess:
-    
+
         # WMMSE experiment
         if exp == 'wmmse':
         
@@ -118,8 +115,7 @@ def mainTrain():
         else:
             
             # Create model
-            model = create_model( sess, exp=exp )
-
+            model = create_model( sess, exp=exp, nNodes=nNodes)
             if mode == 'train':
                 # Create model path
                 if not os.path.exists('models/'+dataID):
