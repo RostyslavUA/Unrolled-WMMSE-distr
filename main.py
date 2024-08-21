@@ -14,15 +14,17 @@ import pickle
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-
 import tensorflow as tf
+from model import UWMMSE
+
 #config = tf.ConfigProto()
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 #tf.logging.set_verbosity(tf.logging.INFO)
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
-from model import UWMMSE
+np.random.seed(0)
+random.seed(0)
 
 # Experiment 
 dataID = sys.argv[1]
@@ -138,7 +140,7 @@ def mainTrain():
                             pdb.set_trace()
                         train_rate += -step_rate
                     train_rate /= train_iter
-                    
+
                     log = "Epoch {}/{}, Average Sum_rate = {:.3f}, Time = {:.3f} sec\n"
                     print(log.format( epoch+1, nEpoch, train_rate, time.time() - start) )
                     
@@ -186,13 +188,5 @@ def mainTrain():
             print(log.format( test_rate, t))
 
             
-if __name__ == "__main__":        
-    import sys
-
-    rn = np.random.randint(2**20)
-    rn1 = np.random.randint(2**20)
-    #tf.set_random_seed(rn)
-    tf.compat.v1.set_random_seed(rn)
-    np.random.seed(rn1)
-
+if __name__ == "__main__":
     mainTrain()
