@@ -31,6 +31,7 @@ def threshold_csi(samp, thr=0.01):
                 attempt = 0
     return adj
 
+
 def hist_csi(train_H, batch_idx, hist_num=5):
     for i in range(hist_num):
         csi = np.array(np.array(train_H[batch_idx][i]))
