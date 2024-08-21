@@ -2,6 +2,17 @@ import pdb
 import tensorflow as tf
 
 
+class GlorotUniformDistr(tf.initializers.GlorotUniform):
+    """
+    Glorot weight initializer (uniform distribution) for distributed models.
+    """
+    def __call__(self, shape, dtype=None, **kwargs):
+        # Make sure that all nodes have same init weights
+        K, num_nodes, input_dim, channels = shape
+        weights_per_node = super(GlorotUniformDistr, self).__call__((K, 1, input_dim, channels), dtype)
+        weights = tf.tile(weights_per_node, [1, num_nodes, 1, 1])
+        return weights
+
 # DUWMMSE
 class DUWMMSE(object):
         # Initialize
@@ -143,11 +154,11 @@ class DUWMMSE(object):
                     with tf.compat.v1.variable_scope('gc_l{}'.format(l+1)):
                         # Weights
                         #w1 = tf.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w1 = tf.compat.v1.get_variable( name='w1', shape=(self.batch_size, self.nNodes, input_dim[l], output_dim[l]),
-                                                        initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        w1 = tf.compat.v1.get_variable( name='w1', shape=(1, self.nNodes, input_dim[l], output_dim[l]),
+                                                        initializer=GlorotUniformDistr(0), dtype=tf.float64)
                         #w0 = tf.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w0 = tf.compat.v1.get_variable( name='w0', shape=(self.batch_size, self.nNodes, input_dim[l], output_dim[l]),
-                                                        initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        w0 = tf.compat.v1.get_variable( name='w0', shape=(1, self.nNodes, input_dim[l], output_dim[l]),
+                                                        initializer=GlorotUniformDistr(0), dtype=tf.float64)
                         ## Biases
                         #b1 = tf.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
                         b1 = tf.compat.v1.get_variable( name='b1', initializer=tf.constant(0.1, shape=(1, self.nNodes, 1, output_dim[l],), dtype=tf.float64) )
@@ -238,7 +249,14 @@ class DUWMMSE(object):
             gradients = tf.gradients(self.obj, self.trainable_params)
 
             # Clip gradients by a given maximum_gradient_norm
-            clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
+            # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
+            clip_gradients = gradients
+            gradients_cons = []
+            for grad in clip_gradients:
+                if len(grad.shape) > 0:
+                    grad = tf.repeat(tf.reduce_sum(grad, 1)[:, tf.newaxis], self.nNodes, 1)
+                gradients_cons.append(grad)
+            clip_gradients = gradients_cons
 
             # Update the model
             self.updates = self.opt.apply_gradients(
@@ -424,9 +442,11 @@ class UWMMSE(object):
                     with tf.compat.v1.variable_scope('gc_l{}'.format(l+1)):
                         # Weights
                         #w1 = tf.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w1 = tf.compat.v1.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        w1 = tf.compat.v1.get_variable( name='w1', shape=(input_dim[l], output_dim[l]),
+                                                        initializer=tf.initializers.glorot_uniform(0), dtype=tf.float64)
                         #w0 = tf.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w0 = tf.compat.v1.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
+                        w0 = tf.compat.v1.get_variable( name='w0', shape=(input_dim[l], output_dim[l]),
+                                                        initializer=tf.initializers.glorot_uniform(0), dtype=tf.float64)
                         
                         ## Biases
                         #b1 = tf.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
@@ -517,8 +537,9 @@ class UWMMSE(object):
             gradients = tf.gradients(self.obj, self.trainable_params)
 
             # Clip gradients by a given maximum_gradient_norm
-            clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
-            
+            # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
+            clip_gradients = gradients
+
             # Update the model
             self.updates = self.opt.apply_gradients(
                 zip(clip_gradients, self.trainable_params), global_step=self.global_step)
