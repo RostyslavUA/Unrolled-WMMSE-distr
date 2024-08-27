@@ -7,6 +7,7 @@ import sys
 import pdb
 import pickle
 import numpy as np
+import scipy.sparse as sp
 import networkx as nx
 import matplotlib.pyplot as plt
 from utils import consensus_matrix
@@ -18,7 +19,7 @@ dataID = sys.argv[1]
 dataID = 'set'+str(dataID)
 
 # Number of nodes
-nNodes = 15
+nNodes = 25
 
 # Path gain exponent
 pl = 2.2
@@ -33,7 +34,7 @@ alpha = 1
 batch_size = 64
 
 # Training iterations
-tr_iter = 10000
+tr_iter = 100
 
 # Testing iterations
 te_iter = 100
@@ -100,7 +101,7 @@ def pl_uma_nlos_optional(batch_size, dist, fc=10):
     return path_loss
 
 
-def get_adj(sample, thr=0.001):
+def get_adj(sample, thr=0.0005):
     adj_0 = np.ones_like(sample)
     adj_0[sample > thr] = 0.0
     adj_0 += adj_0.T
@@ -111,9 +112,7 @@ def get_adj(sample, thr=0.001):
 
 def generate_csi_and_operators(dataset_size, batch_size, dist, plot_save=False):
     tr_H, tr_adj, tr_cmat = [], [], []
-    batch_H = np.zeros((batch_size, *dist.shape))
-    batch_adj = np.zeros((batch_size, *dist.shape))
-    batch_cmat = np.zeros((batch_size, *dist.shape))
+    batch_H, batch_adj, batch_cmat = [], [], []
     i = 0
     while True:
         # sample training data
@@ -121,11 +120,12 @@ def generate_csi_and_operators(dataset_size, batch_size, dist, plot_save=False):
         H = sample_graph(1, dist)
         H = np.squeeze(H, 0)
         adj = get_adj(H)
-        cmat = consensus_matrix(adj)[1].todense()
+        cmat = consensus_matrix(adj)[1]
+        adj = sp.csr_matrix(adj)
         if nx.is_connected(nx.Graph(adj)):
-            batch_H[i] = H
-            batch_adj[i] = adj
-            batch_cmat[i] = cmat
+            batch_H.append(H)
+            batch_adj.append(adj)
+            batch_cmat.append(cmat)
             if plot_save:
                 g = nx.Graph(adj)
                 g.remove_edges_from(nx.selfloop_edges(g))
@@ -137,16 +137,17 @@ def generate_csi_and_operators(dataset_size, batch_size, dist, plot_save=False):
                 plt.clf()
                 if i == 20:
                     import sys; sys.exit(0)
+            if len(tr_H)/5*dataset_size % dataset_size == 0 and i == 0:
+                print(len(tr_H)/dataset_size)
             i += 1
             if i == batch_size:
                 i = 0
+                batch_adj = sp.vstack(batch_adj)
+                batch_cmat = sp.vstack(batch_cmat)
                 tr_H.append(batch_H)
                 tr_adj.append(batch_adj)
                 tr_cmat.append(batch_cmat)
-                batch_H = np.zeros((batch_size, *dist.shape))
-                batch_adj = np.zeros((batch_size, *dist.shape))
-                batch_cmat = np.zeros((batch_size, *dist.shape))
-                print(len(tr_H))
+                batch_H, batch_adj, batch_cmat = [], [], []
         if len(tr_H) == dataset_size-1:
             break
     return tr_H, tr_adj, tr_cmat
@@ -183,10 +184,10 @@ def main():
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
     f.close()
-    f = open('data/'+dataID+'/adj.pkl', 'wb')
+    f = open('data/'+dataID+'/adj_csr.pkl', 'wb')
     pickle.dump(data_adj, f)
     f.close()
-    f = open('data/'+dataID+'/cmat.pkl', 'wb')
+    f = open('data/'+dataID+'/cmat_csr.pkl', 'wb')
     pickle.dump(data_cmat, f)
     f.close()
 
