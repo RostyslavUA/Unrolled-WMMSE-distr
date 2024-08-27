@@ -135,13 +135,13 @@ def mainTrain():
                 
                     for it in range(train_iter):
                         batch_train_inputs = train_H[it]
-                        step_rate, batch_rate, power  = model.train( sess, inputs=batch_train_inputs ) 
+                        step_rate, batch_rate, power = model.train( sess, inputs=batch_train_inputs )
                         if np.isnan(step_rate) or np.isinf(step_rate) :
                             pdb.set_trace()
                         train_rate += -step_rate
                     train_rate /= train_iter
 
-                    log = "Epoch {}/{}, Average Sum_rate = {:.3f}, Time = {:.3f} sec\n"
+                    log = "Epoch {}/{}, Average Sum_rate = {:.6f}, Time = {:.3f} sec\n"
                     print(log.format( epoch+1, nEpoch, train_rate, time.time() - start) )
                     
                     # Save model with best average sum-rate
@@ -184,7 +184,7 @@ def mainTrain():
             ## Average per-iteration test time   
             t = t / test_iter
 
-            log = "Test_rate = {:.3f}, Time = {:.3f} sec\n"
+            log = "Test_rate = {:.6f}, Time = {:.3f} sec\n"
             print(log.format( test_rate, t))
 
             
