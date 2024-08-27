@@ -26,12 +26,16 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 np.random.seed(0)
 random.seed(0)
 
+
+optimizer = 'gd'
+
 # Experiment
 dataID = sys.argv[1]
 exp = sys.argv[2]
 if len( sys.argv ) > 3:
     mode = sys.argv[3]
-
+if len(sys.argv) > 4:
+    optimizer = sys.argv[4]
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -47,8 +51,6 @@ batch_size = 64
 
 # Layers UWMMSE = 4 (default)  WMMSE = 100 (default)
 layers = 4 if exp == 'duwmmse' else 100
-
-optimizer = 'gd'
 
 # Learning rate
 learning_rate=1e-3
@@ -152,7 +154,7 @@ def mainTrain():
                     # Save model with best average sum-rate
                     if train_rate > max_rate:
                         max_rate = train_rate
-                        model.save(sess, path='models/'+dataID+'/uwmmse-model', global_step=(epoch+1))
+                        model.save(sess, path='models/{}_d_{}/duwmmse-model'.format(dataID, optimizer), global_step=(epoch+1))
                     
                     # Shuffle
                     shuffled_indices = np.random.permutation(train_iter)
@@ -165,7 +167,7 @@ def mainTrain():
             test_iter = len(test_H)       
 
             # Restore best saved model
-            model.restore(sess, path='models/'+dataID+'/')
+            model.restore(sess,path='models/{}_d_{}/'.format(dataID, optimizer))
 
             print( '\nDUWMMSE Testing Started\n' )
 
