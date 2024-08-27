@@ -68,13 +68,16 @@ def create_model( session, exp='duwmmse', nNodes=None ):
     
     return model
 
+
 # Train
 def mainTrain():        
     # Data
     H = pickle.load( open( 'data/'+dataID+'/H.pkl', 'rb' ) )
+    cmat = pickle.load(open('data/'+dataID+'/cmat.pkl', 'rb'))
     
     #Training data
     train_H = H['train_H']
+    train_cmat = cmat['train_cmat']
     nNodes = train_H[0].shape[-1]
     
     #Test data
@@ -135,14 +138,15 @@ def mainTrain():
                     train_rate = 0.0
                 
                     for it in range(train_iter):
-                        batch_train_inputs = train_H[it]
-                        step_rate, batch_rate, power  = model.train( sess, inputs=batch_train_inputs ) 
+                        batch_train_H = train_H[it]
+                        batch_train_cmat = train_cmat[it]
+                        batch_train_inputs = (batch_train_H, batch_train_cmat)
+                        step_rate, batch_rate, power = model.train( sess, inputs=batch_train_inputs )
                         if np.isnan(step_rate) or np.isinf(step_rate) :
                             pdb.set_trace()
                         train_rate += -step_rate
                     train_rate /= train_iter
-
-                    log = "Epoch {}/{}, Average Sum_rate = {:.3f}, Time = {:.3f} sec\n"
+                    log = "Epoch {}/{}, Average Sum_rate = {:.6f}, Time = {:.3f} sec\n"
                     print(log.format( epoch+1, nEpoch, train_rate, time.time() - start) )
                     
                     # Save model with best average sum-rate
@@ -163,7 +167,7 @@ def mainTrain():
             # Restore best saved model
             model.restore(sess, path='models/'+dataID+'/')
 
-            print( '\nUWMMSE Testing Started\n' )
+            print( '\nDUWMMSE Testing Started\n' )
 
             t = 0.
             test_rate = 0.0
@@ -185,7 +189,7 @@ def mainTrain():
             ## Average per-iteration test time   
             t = t / test_iter
 
-            log = "Test_rate = {:.3f}, Time = {:.3f} sec\n"
+            log = "Test_rate = {:.6f}, Time = {:.3f} sec\n"
             print(log.format( test_rate, t))
 
 

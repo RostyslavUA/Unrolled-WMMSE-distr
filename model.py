@@ -1,5 +1,7 @@
 import pdb
+import numpy as np
 import tensorflow as tf
+import networkx as nx
 
 
 class GlorotUniformDistr(tf.initializers.GlorotUniform):
@@ -9,8 +11,8 @@ class GlorotUniformDistr(tf.initializers.GlorotUniform):
     def __call__(self, shape, dtype=None, **kwargs):
         # Make sure that all nodes have same init weights
         K, num_nodes, input_dim, channels = shape
-        weights_per_node = super(GlorotUniformDistr, self).__call__((K, 1, input_dim, channels), dtype)
-        weights = tf.tile(weights_per_node, [1, num_nodes, 1, 1])
+        weights_per_node = super(GlorotUniformDistr, self).__call__((1, 1, input_dim, channels), dtype)
+        weights = tf.tile(weights_per_node, [K, num_nodes, 1, 1])
         return weights
 
 # DUWMMSE
@@ -40,6 +42,7 @@ class DUWMMSE(object):
         def init_placeholders(self):
             # CSI [Batch_size X Nodes X Nodes]
             self.H = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="H")
+            self.cmat = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="cmat")
 
             # NSI [Batch_size X Nodes X Features]
             #self.x = tf.compat.v1.placeholder(tf.float64, shape=[None, None, self.feature_dim], name="x")
@@ -154,16 +157,16 @@ class DUWMMSE(object):
                     with tf.compat.v1.variable_scope('gc_l{}'.format(l+1)):
                         # Weights
                         #w1 = tf.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w1 = tf.compat.v1.get_variable( name='w1', shape=(1, self.nNodes, input_dim[l], output_dim[l]),
-                                                        initializer=GlorotUniformDistr(0), dtype=tf.float64)
+                        w1 = tf.compat.v1.get_variable( name='w1', shape=(self.batch_size, self.nNodes, input_dim[l], output_dim[l]),
+                                                        initializer=GlorotUniformDistr(l), dtype=tf.float64)
                         #w0 = tf.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
-                        w0 = tf.compat.v1.get_variable( name='w0', shape=(1, self.nNodes, input_dim[l], output_dim[l]),
-                                                        initializer=GlorotUniformDistr(0), dtype=tf.float64)
+                        w0 = tf.compat.v1.get_variable( name='w0', shape=(self.batch_size, self.nNodes, input_dim[l], output_dim[l]),
+                                                        initializer=GlorotUniformDistr(l), dtype=tf.float64)
                         ## Biases
                         #b1 = tf.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
-                        b1 = tf.compat.v1.get_variable( name='b1', initializer=tf.constant(0.1, shape=(1, self.nNodes, 1, output_dim[l],), dtype=tf.float64) )
+                        b1 = tf.compat.v1.get_variable( name='b1', initializer=tf.constant(0.1, shape=(self.batch_size, self.nNodes, 1, output_dim[l],), dtype=tf.float64) )
                         #b0 = tf.get_variable( name='b0', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
-                        b0 = tf.compat.v1.get_variable( name='b0', initializer=tf.constant(0.1, shape=(1, self.nNodes, 1, output_dim[l],), dtype=tf.float64) )
+                        b0 = tf.compat.v1.get_variable( name='b0', initializer=tf.constant(0.1, shape=(self.batch_size, self.nNodes, 1, output_dim[l],), dtype=tf.float64) )
                         # XW
                         x1 = tf.matmul(x, w1)
                         x0 = tf.matmul(x, w0)
@@ -227,6 +230,21 @@ class DUWMMSE(object):
             if self.exp == 'duwmmse':
                 self.init_optimizer()
 
+        def consensus(self, clip_gradients):
+            gradients_cons = []
+            for grad in clip_gradients:
+                if len(grad.shape) > 0:
+                    grad_resh = tf.reshape(grad, (self.batch_size, self.nNodes, -1))
+                    for _ in range(1):
+                        grad_resh = self.cmat @ grad_resh
+                    grad = tf.reshape(grad_resh, grad.shape) * self.nNodes
+                gradients_cons.append(grad)
+            # Sum over minibatch
+            for i, grad in enumerate(gradients_cons):
+                if len(grad.shape) > 0:
+                    gradients_cons[i] = tf.repeat(tf.reduce_sum(grad, 0)[tf.newaxis], self.batch_size, 0)
+            return gradients_cons
+
         def init_optimizer(self):
             # Gradients and SGD update operation for training the model
             self.trainable_params = tf.compat.v1.trainable_variables()
@@ -251,13 +269,7 @@ class DUWMMSE(object):
             # Clip gradients by a given maximum_gradient_norm
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
             clip_gradients = gradients
-            gradients_cons = []
-            for grad in clip_gradients:
-                if len(grad.shape) > 0:
-                    grad = tf.repeat(tf.reduce_sum(grad, 1)[:, tf.newaxis], self.nNodes, 1)
-                gradients_cons.append(grad)
-            clip_gradients = gradients_cons
-
+            clip_gradients = self.consensus(clip_gradients)
             # Update the model
             self.updates = self.opt.apply_gradients(
                 zip(clip_gradients, self.trainable_params), global_step=self.global_step)
@@ -272,7 +284,9 @@ class DUWMMSE(object):
 
         def train(self, sess, inputs ):
             input_feed = dict()
-            input_feed[self.H.name] = inputs
+            input_feed[self.H.name] = inputs[0]
+            input_feed[self.cmat.name] = inputs[1]
+            # self.build_consensus()
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
@@ -443,10 +457,10 @@ class UWMMSE(object):
                         # Weights
                         #w1 = tf.get_variable( name='w1', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
                         w1 = tf.compat.v1.get_variable( name='w1', shape=(input_dim[l], output_dim[l]),
-                                                        initializer=tf.initializers.glorot_uniform(0), dtype=tf.float64)
+                                                        initializer=tf.initializers.glorot_uniform(l), dtype=tf.float64)
                         #w0 = tf.get_variable( name='w0', shape=(input_dim[l], output_dim[l]), initializer=tf.initializers.glorot_uniform(), dtype=tf.float64)
                         w0 = tf.compat.v1.get_variable( name='w0', shape=(input_dim[l], output_dim[l]),
-                                                        initializer=tf.initializers.glorot_uniform(0), dtype=tf.float64)
+                                                        initializer=tf.initializers.glorot_uniform(l), dtype=tf.float64)
                         
                         ## Biases
                         #b1 = tf.get_variable( name='b1', initializer=tf.constant(0.1, shape=(output_dim[l],), dtype=tf.float64) )
