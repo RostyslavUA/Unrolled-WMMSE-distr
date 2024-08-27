@@ -142,8 +142,8 @@ def generate_csi_and_operators(dataset_size, batch_size, dist, plot_save=False):
             i += 1
             if i == batch_size:
                 i = 0
-                batch_adj = sp.vstack(batch_adj)
-                batch_cmat = sp.vstack(batch_cmat)
+                batch_adj = sp.block_diag(batch_adj)
+                batch_cmat = sp.block_diag(batch_cmat)
                 tr_H.append(batch_H)
                 tr_adj.append(batch_adj)
                 tr_cmat.append(batch_cmat)
