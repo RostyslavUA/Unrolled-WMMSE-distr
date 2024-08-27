@@ -1,6 +1,28 @@
+import copy
 import numpy as np
+import scipy.sparse as sp
 import networkx as nx
 import matplotlib.pyplot as plt
+
+
+def consensus_matrix(adj_0):
+    # Metropolis-Hastings weights
+    # https://web.stanford.edu/~boyd/papers/pdf/lmsc_mtns06.pdf
+    adj = copy.deepcopy(adj_0)
+    size = adj.shape[0]
+    if np.max(adj.diagonal(0)) != 0:
+        np.fill_diagonal(adj, 0)
+    adj = sp.coo_matrix(adj)
+    d_vec = np.array(adj.sum(1)) + 1
+    d_mtx = sp.diags(d_vec.flatten())
+    d_i_mtx = d_mtx.dot(adj)
+    d_j_mtx = d_i_mtx.transpose()
+    d_max_mtx = d_i_mtx.maximum(d_j_mtx).toarray()
+    d_max_inv = np.divide(1, d_max_mtx, out=np.zeros_like(d_max_mtx), where=d_max_mtx != 0)
+    on_diag = np.ones(size) - d_max_inv.sum(1)
+    np.fill_diagonal(d_max_inv, on_diag)
+    c_mtx = sp.csr_matrix(d_max_inv)
+    return d_max_inv, c_mtx
 
 
 def threshold_csi(samp, thr=0.01):
@@ -29,6 +51,10 @@ def threshold_csi(samp, thr=0.01):
             if attempt == 100:  # Cannot converge. Increasing threshold
                 thr += thr_init
                 attempt = 0
+    if any(adj.flatten() != adj.T.flatten()):
+        adj = adj + adj.T
+        adj = np.divide(adj, adj, out=np.zeros_like(adj), where=adj != 0)
+    np.fill_diagonal(adj, 1.0)
     return adj
 
 
