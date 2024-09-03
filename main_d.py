@@ -32,10 +32,16 @@ optimizer = 'gd'
 # Experiment
 dataID = sys.argv[1]
 exp = sys.argv[2]
+cmat_sparse = False
+grad_subsample_p = 0.0
 if len( sys.argv ) > 3:
     mode = sys.argv[3]
 if len(sys.argv) > 4:
     optimizer = sys.argv[4]
+if len(sys.argv) > 5:
+    cmat_sparse = bool(int(sys.argv[5]))
+if len(sys.argv) > 6:
+    grad_subsample_p = float(sys.argv[6])  # subsample a graph during backprop with Bernoulli(p, 1-p)
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -60,10 +66,10 @@ nEpoch = 20
 
     
 # Create Model Instance
-def create_model( session, exp='duwmmse', nNodes=None ):
+def create_model( session, exp='duwmmse', nNodes=None, grad_subsample_p = 0.0):
     # Create
     model = DUWMMSE( nNodes, Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers,
-                     learning_rate=learning_rate, exp=exp, optimizer=optimizer )
+                     learning_rate=learning_rate, exp=exp, optimizer=optimizer, grad_subsample_p=grad_subsample_p)
 
     # Initialize variables ( To train from scratch )
     session.run(tf.compat.v1.global_variables_initializer())
@@ -79,7 +85,8 @@ def mainTrain():
     
     #Training data
     train_H = H['train_H']
-    train_cmat = cmat['train_cmat']
+    if cmat_sparse:
+        train_cmat = cmat['train_cmat']
     nNodes = train_H[0].shape[-1]
     
     #Test data
@@ -123,7 +130,7 @@ def mainTrain():
         else:
             
             # Create model
-            model = create_model( sess, exp=exp, nNodes=nNodes)
+            model = create_model( sess, exp=exp, nNodes=nNodes, grad_subsample_p=grad_subsample_p)
             if mode == 'train':
                 # Create model path
                 if not os.path.exists('models/'+dataID):
@@ -141,7 +148,10 @@ def mainTrain():
                 
                     for it in range(train_iter):
                         batch_train_H = train_H[it]
-                        batch_train_cmat = train_cmat[it]
+                        if cmat_sparse:
+                            batch_train_cmat = train_cmat[it]
+                        else:
+                            batch_train_cmat = np.ones_like(batch_train_H)/nNodes  # Averaging
                         batch_train_inputs = (batch_train_H, batch_train_cmat)
                         step_rate, batch_rate, power = model.train( sess, inputs=batch_train_inputs )
                         if np.isnan(step_rate) or np.isinf(step_rate) :

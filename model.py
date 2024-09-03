@@ -19,7 +19,7 @@ class GlorotUniformDistr(tf.initializers.GlorotUniform):
 class DUWMMSE(object):
         # Initialize
         def __init__( self, nNodes, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3,
-                      max_gradient_norm=5.0, exp='duwmmse', optimizer='adam' ):
+                      max_gradient_norm=5.0, exp='duwmmse', optimizer='adam', grad_subsample_p=0.0):
             self.nNodes = nNodes
             self.Pmax              = tf.cast( Pmax, tf.float64 )
             self.var               = var
@@ -31,6 +31,7 @@ class DUWMMSE(object):
             self.exp               = exp
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
             self.optimizer = optimizer
+            self.grad_subsample_p = grad_subsample_p
             self.build_model()
 
         # Build Model
@@ -43,6 +44,7 @@ class DUWMMSE(object):
             # CSI [Batch_size X Nodes X Nodes]
             self.H = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="H")
             self.cmat = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="cmat")
+            self.subsample_prob = tf.compat.v1.placeholder(tf.float64, shape=[None, 2], name="subsample_prob")
 
             # NSI [Batch_size X Nodes X Features]
             #self.x = tf.compat.v1.placeholder(tf.float64, shape=[None, None, self.feature_dim], name="x")
@@ -236,7 +238,7 @@ class DUWMMSE(object):
                 if len(grad.shape) > 0:
                     grad_resh = tf.reshape(grad, (self.batch_size, self.nNodes, -1))
                     for _ in range(1):
-                        grad_resh = self.cmat @ grad_resh
+                        grad_resh = self.cmat @ grad_resh  # TODO: advanced minibatching w/ sparse matrix
                     grad = tf.reshape(grad_resh, grad.shape) * self.nNodes
                 gradients_cons.append(grad)
             # Sum over minibatch
@@ -269,6 +271,15 @@ class DUWMMSE(object):
             # Clip gradients by a given maximum_gradient_norm
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
             clip_gradients = gradients
+            if self.grad_subsample_p != 0.0:
+                bern_pq = tf.repeat(tf.constant([[self.grad_subsample_p, 1-self.grad_subsample_p]],
+                                                            dtype=tf.float64),
+                                                self.batch_size, 0)
+                self.subsample_prob = tf.random.categorical(tf.math.log(bern_pq), self.nNodes, dtype=tf.int32)
+                self.subsample_prob = tf.cast(self.subsample_prob, dtype=tf.float64)
+                for i, grad in enumerate(clip_gradients):
+                    if len(grad.shape) > 0:
+                        clip_gradients[i] = grad * self.subsample_prob[:, :, tf.newaxis, tf.newaxis]
             clip_gradients = self.consensus(clip_gradients)
             # Update the model
             self.updates = self.opt.apply_gradients(
@@ -286,7 +297,6 @@ class DUWMMSE(object):
             input_feed = dict()
             input_feed[self.H.name] = inputs[0]
             input_feed[self.cmat.name] = inputs[1]
-            # self.build_consensus()
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
