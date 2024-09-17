@@ -35,16 +35,15 @@ exp = sys.argv[2]
 cmat_sparse = False
 grad_subsample_p = 0.0
 dropout_op = 0.0
+learning_rate = 1e-3
 if len( sys.argv ) > 3:
     mode = sys.argv[3]
 if len(sys.argv) > 4:
     optimizer = sys.argv[4]
 if len(sys.argv) > 5:
-    cmat_sparse = bool(int(sys.argv[5]))
+    dropout_op = float(sys.argv[5])
 if len(sys.argv) > 6:
-    grad_subsample_p = float(sys.argv[6])  # subsample a graph during backprop with Bernoulli(p, 1-p)
-if len(sys.argv) > 7:
-    dropout_op = float(sys.argv[7])
+    learning_rate = float(sys.argv[6])
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -60,9 +59,6 @@ batch_size = 64
 
 # Layers UWMMSE = 4 (default)  WMMSE = 100 (default)
 layers = 4 if exp == 'duwmmse' else 100
-
-# Learning rate
-learning_rate=1e-3
 
 # Number of epochs
 nEpoch = 20
@@ -85,11 +81,11 @@ def create_model( session, exp='duwmmse', nNodes=None, grad_subsample_p = 0.0, d
 def mainTrain():        
     # Data
     H = pickle.load( open( 'data/'+dataID+'/H.pkl', 'rb' ) )
-    cmat = pickle.load(open('data/'+dataID+'/cmat.pkl', 'rb'))
-    
+
     #Training data
     train_H = H['train_H']
     if cmat_sparse:
+        cmat = pickle.load(open('data/'+dataID+'/cmat.pkl', 'rb'))
         train_cmat = cmat['train_cmat']
     nNodes = train_H[0].shape[-1]
     

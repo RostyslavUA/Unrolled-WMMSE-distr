@@ -33,12 +33,15 @@ optimizer = 'gd'
 dataID = sys.argv[1]
 exp = sys.argv[2]
 dropout_op = 0.0
+learning_rate = 1e-3
 if len( sys.argv ) > 3:
     mode = sys.argv[3]
 if len(sys.argv) > 4:
     optimizer = sys.argv[4]
 if len(sys.argv) > 5:
     dropout_op = float(sys.argv[5])
+if len(sys.argv) > 6:
+    learning_rate = float(sys.argv[6])
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -55,8 +58,6 @@ batch_size = 64
 # Layers UWMMSE = 4 (default)  WMMSE = 100 (default)
 layers = 4 if exp == 'uwmmse' else 100
 
-# Learning rate
-learning_rate=1e-3
 
 # Number of epochs
 nEpoch = 20
