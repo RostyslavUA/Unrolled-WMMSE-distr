@@ -15,11 +15,19 @@ class GlorotUniformDistr(tf.initializers.GlorotUniform):
         weights = tf.tile(weights_per_node, [K, num_nodes, 1, 1])
         return weights
 
+
+def dropout(inputs, rate=0.0):
+    noise_shape = tf.shape(inputs)
+    random_tensor = tf.random.uniform(noise_shape)
+    dropout_mask = tf.cast(random_tensor >= rate, inputs.dtype)
+    return inputs * dropout_mask
+
+
 # DUWMMSE
 class DUWMMSE(object):
         # Initialize
         def __init__( self, nNodes, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3,
-                      max_gradient_norm=5.0, exp='duwmmse', optimizer='adam', grad_subsample_p=0.0):
+                      max_gradient_norm=5.0, exp='duwmmse', optimizer='adam', grad_subsample_p=0.0, dropout_op=0.0):
             self.nNodes = nNodes
             self.Pmax              = tf.cast( Pmax, tf.float64 )
             self.var               = var
@@ -32,6 +40,7 @@ class DUWMMSE(object):
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
             self.optimizer = optimizer
             self.grad_subsample_p = grad_subsample_p
+            self.dropout_op = dropout_op
             self.build_model()
 
         # Build Model
@@ -45,6 +54,7 @@ class DUWMMSE(object):
             self.H = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="H")
             self.cmat = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="cmat")
             self.subsample_prob = tf.compat.v1.placeholder(tf.float64, shape=[None, 2], name="subsample_prob")
+            self.training = tf.compat.v1.placeholder(tf.bool, name="training")
 
             # NSI [Batch_size X Nodes X Features]
             #self.x = tf.compat.v1.placeholder(tf.float64, shape=[None, None, self.feature_dim], name="x")
@@ -175,9 +185,17 @@ class DUWMMSE(object):
                         x1 = tf.reshape(x1, shape=(self.batch_size, self.nNodes, output_dim[l]))
                         x0 = tf.reshape(x0, shape=(self.batch_size, self.nNodes, output_dim[l]))
 
+                        # dropout
+                        H_drop = tf.cond(self.training,
+                                         lambda: dropout(self.H, self.dropout_op),
+                                         lambda: self.H)
+                        dH_drop = tf.cond(self.training,
+                                         lambda: dropout(self.dH, self.dropout_op),
+                                         lambda: self.dH)
+
                         # diag(A)XW0 + AXW1
-                        x1 = tf.matmul(self.H, x1)
-                        x0 = tf.matmul(self.dH, x0)
+                        x1 = tf.matmul(H_drop, x1)
+                        x0 = tf.matmul(dH_drop, x0)
                         x1 = tf.reshape(x1, shape=(self.batch_size, self.nNodes, 1, output_dim[l]))
                         x0 = tf.reshape(x0, shape=(self.batch_size, self.nNodes, 1, output_dim[l]))
                         ## AXW + B
@@ -297,6 +315,7 @@ class DUWMMSE(object):
             input_feed = dict()
             input_feed[self.H.name] = inputs[0]
             input_feed[self.cmat.name] = inputs[1]
+            input_feed[self.training.name] = True
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
@@ -312,6 +331,7 @@ class DUWMMSE(object):
         def eval(self, sess, inputs ):
             input_feed = dict()
             input_feed[self.H.name] = inputs
+            input_feed[self.training.name] = False
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
@@ -329,7 +349,7 @@ class DUWMMSE(object):
 class UWMMSE(object):
         # Initialize
         def __init__( self, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3,
-                      max_gradient_norm=5.0, exp='uwmmse', optimizer='adam'):
+                      max_gradient_norm=5.0, exp='uwmmse', optimizer='adam', dropout_op=0.0):
             self.Pmax              = tf.cast( Pmax, tf.float64 )
             self.var               = var
             self.feature_dim       = feature_dim
@@ -340,6 +360,7 @@ class UWMMSE(object):
             self.exp               = exp
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
             self.optimizer = optimizer
+            self.dropout_op = dropout_op
             self.build_model()
 
         # Build Model
@@ -351,7 +372,8 @@ class UWMMSE(object):
         def init_placeholders(self):
             # CSI [Batch_size X Nodes X Nodes]
             self.H = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="H")
-            
+            self.training = tf.compat.v1.placeholder(tf.bool, name="training")
+
             # NSI [Batch_size X Nodes X Features]
             #self.x = tf.compat.v1.placeholder(tf.float64, shape=[None, None, self.feature_dim], name="x")
             
@@ -481,10 +503,18 @@ class UWMMSE(object):
                         # XW
                         x1 = tf.matmul(x, w1)
                         x0 = tf.matmul(x, w0)
+
+                        # dropout
+                        H_drop = tf.cond(self.training,
+                                         lambda: dropout(self.H, self.dropout_op),
+                                         lambda: self.H)
+                        dH_drop = tf.cond(self.training,
+                                         lambda: dropout(self.dH, self.dropout_op),
+                                         lambda: self.dH)
                         
                         # diag(A)XW0 + AXW1
-                        x1 = tf.matmul(self.H, x1)  
-                        x0 = tf.matmul(self.dH, x0)
+                        x1 = tf.matmul(H_drop, x1)
+                        x0 = tf.matmul(dH_drop, x0)
                         
                         ## AXW + B
                         x1 = tf.add(x1, b1)
@@ -579,6 +609,7 @@ class UWMMSE(object):
         def train(self, sess, inputs ):
             input_feed = dict()
             input_feed[self.H.name] = inputs
+            input_feed[self.training.name] = True
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
             
@@ -595,6 +626,7 @@ class UWMMSE(object):
         def eval(self, sess, inputs ):
             input_feed = dict()
             input_feed[self.H.name] = inputs
+            input_feed[self.training.name] = False
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 

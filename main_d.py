@@ -34,6 +34,7 @@ dataID = sys.argv[1]
 exp = sys.argv[2]
 cmat_sparse = False
 grad_subsample_p = 0.0
+dropout_op = 0.0
 if len( sys.argv ) > 3:
     mode = sys.argv[3]
 if len(sys.argv) > 4:
@@ -42,6 +43,8 @@ if len(sys.argv) > 5:
     cmat_sparse = bool(int(sys.argv[5]))
 if len(sys.argv) > 6:
     grad_subsample_p = float(sys.argv[6])  # subsample a graph during backprop with Bernoulli(p, 1-p)
+if len(sys.argv) > 7:
+    dropout_op = float(sys.argv[7])
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -66,10 +69,11 @@ nEpoch = 20
 
     
 # Create Model Instance
-def create_model( session, exp='duwmmse', nNodes=None, grad_subsample_p = 0.0):
+def create_model( session, exp='duwmmse', nNodes=None, grad_subsample_p = 0.0, dropout_op=0.0):
     # Create
     model = DUWMMSE( nNodes, Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers,
-                     learning_rate=learning_rate, exp=exp, optimizer=optimizer, grad_subsample_p=grad_subsample_p)
+                     learning_rate=learning_rate, exp=exp, optimizer=optimizer, grad_subsample_p=grad_subsample_p,
+                     dropout_op=dropout_op)
 
     # Initialize variables ( To train from scratch )
     session.run(tf.compat.v1.global_variables_initializer())
@@ -91,7 +95,7 @@ def mainTrain():
     
     #Test data
     test_H = H['test_H']
-    
+
     # Initiate TF session
     with tf.compat.v1.Session(config=config) as sess:
 
@@ -130,7 +134,7 @@ def mainTrain():
         else:
             
             # Create model
-            model = create_model( sess, exp=exp, nNodes=nNodes, grad_subsample_p=grad_subsample_p)
+            model = create_model(sess, exp, nNodes, grad_subsample_p, dropout_op)
             if mode == 'train':
                 # Create model path
                 if not os.path.exists('models/'+dataID):

@@ -32,10 +32,13 @@ optimizer = 'gd'
 # Experiment 
 dataID = sys.argv[1]
 exp = sys.argv[2]
+dropout_op = 0.0
 if len( sys.argv ) > 3:
     mode = sys.argv[3]
 if len(sys.argv) > 4:
     optimizer = sys.argv[4]
+if len(sys.argv) > 5:
+    dropout_op = float(sys.argv[5])
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -60,10 +63,10 @@ nEpoch = 20
 
     
 # Create Model Instance
-def create_model( session, exp='uwmmse' ):
+def create_model( session, exp='uwmmse', dropout_op=0.0):
     # Create
     model = UWMMSE( Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers,
-                    learning_rate=learning_rate, exp=exp, optimizer=optimizer )
+                    learning_rate=learning_rate, exp=exp, optimizer=optimizer, dropout_op=dropout_op)
     # Initialize variables ( To train from scratch )
     session.run(tf.compat.v1.global_variables_initializer())
     
@@ -118,7 +121,7 @@ def mainTrain():
         else:
             
             # Create model 
-            model = create_model( sess )
+            model = create_model(sess, dropout_op=dropout_op)
 
             if mode == 'train':
                 # Create model path
