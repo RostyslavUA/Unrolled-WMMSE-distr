@@ -256,7 +256,8 @@ class DUWMMSE(object):
                 if len(grad.shape) > 0:
                     grad_resh = tf.reshape(grad, (self.batch_size, self.nNodes, -1))
                     for _ in range(1):
-                        grad_resh = self.cmat @ grad_resh  # TODO: advanced minibatching w/ sparse matrix
+                        cmat_drop = dropout(self.cmat, self.dropout_op)
+                        grad_resh = cmat_drop @ grad_resh  # TODO: advanced minibatching w/ sparse matrix
                     grad = tf.reshape(grad_resh, grad.shape) * self.nNodes
                 gradients_cons.append(grad)
             # Sum over minibatch
