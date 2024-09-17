@@ -54,7 +54,7 @@ class DUWMMSE(object):
             self.H = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="H")
             self.cmat = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="cmat")
             self.subsample_prob = tf.compat.v1.placeholder(tf.float64, shape=[None, 2], name="subsample_prob")
-            self.training = tf.compat.v1.placeholder(tf.bool, name="training")
+            self.apply_dropout = tf.compat.v1.placeholder(tf.bool, name="apply_dropout")
 
             # NSI [Batch_size X Nodes X Features]
             #self.x = tf.compat.v1.placeholder(tf.float64, shape=[None, None, self.feature_dim], name="x")
@@ -186,10 +186,10 @@ class DUWMMSE(object):
                         x0 = tf.reshape(x0, shape=(self.batch_size, self.nNodes, output_dim[l]))
 
                         # dropout
-                        H_drop = tf.cond(self.training,
+                        H_drop = tf.cond(self.apply_dropout,
                                          lambda: dropout(self.H, self.dropout_op),
                                          lambda: self.H)
-                        dH_drop = tf.cond(self.training,
+                        dH_drop = tf.cond(self.apply_dropout,
                                          lambda: dropout(self.dH, self.dropout_op),
                                          lambda: self.dH)
 
@@ -315,7 +315,7 @@ class DUWMMSE(object):
             input_feed = dict()
             input_feed[self.H.name] = inputs[0]
             input_feed[self.cmat.name] = inputs[1]
-            input_feed[self.training.name] = True
+            input_feed[self.apply_dropout.name] = True
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
@@ -331,7 +331,7 @@ class DUWMMSE(object):
         def eval(self, sess, inputs ):
             input_feed = dict()
             input_feed[self.H.name] = inputs
-            input_feed[self.training.name] = False
+            input_feed[self.apply_dropout.name] = True
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
@@ -372,7 +372,7 @@ class UWMMSE(object):
         def init_placeholders(self):
             # CSI [Batch_size X Nodes X Nodes]
             self.H = tf.compat.v1.placeholder(tf.float64, shape=[None, None, None], name="H")
-            self.training = tf.compat.v1.placeholder(tf.bool, name="training")
+            self.apply_dropout = tf.compat.v1.placeholder(tf.bool, name="apply_dropout")
 
             # NSI [Batch_size X Nodes X Features]
             #self.x = tf.compat.v1.placeholder(tf.float64, shape=[None, None, self.feature_dim], name="x")
@@ -505,10 +505,10 @@ class UWMMSE(object):
                         x0 = tf.matmul(x, w0)
 
                         # dropout
-                        H_drop = tf.cond(self.training,
+                        H_drop = tf.cond(self.apply_dropout,
                                          lambda: dropout(self.H, self.dropout_op),
                                          lambda: self.H)
-                        dH_drop = tf.cond(self.training,
+                        dH_drop = tf.cond(self.apply_dropout,
                                          lambda: dropout(self.dH, self.dropout_op),
                                          lambda: self.dH)
                         
@@ -609,7 +609,7 @@ class UWMMSE(object):
         def train(self, sess, inputs ):
             input_feed = dict()
             input_feed[self.H.name] = inputs
-            input_feed[self.training.name] = True
+            input_feed[self.apply_dropout.name] = True
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
             
@@ -626,7 +626,7 @@ class UWMMSE(object):
         def eval(self, sess, inputs ):
             input_feed = dict()
             input_feed[self.H.name] = inputs
-            input_feed[self.training.name] = False
+            input_feed[self.apply_dropout.name] = True
             #input_feed[self.x.name] = features
             #input_feed[self.alpha.name] = alpha
 
