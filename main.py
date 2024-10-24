@@ -83,6 +83,7 @@ def mainTrain():
     
     #Test data
     test_H = H['test_H']
+    test_iter = len(test_H)
     
     # Initiate TF session
     with tf.compat.v1.Session(config=config) as sess:
@@ -147,8 +148,29 @@ def mainTrain():
                         train_rate += -step_rate
                     train_rate /= train_iter
 
-                    log = "Epoch {}/{}, Average Sum_rate = {:.6f}, Time = {:.3f} sec\n"
-                    print(log.format( epoch+1, nEpoch, train_rate, time.time() - start) )
+                    t = 0.
+                    test_rate = 0.0
+                    sum_rate = []
+
+                    for batch in range(test_iter):
+                        batch_test_inputs = test_H[batch]
+                        start = time.time()
+                        avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs )
+                        if np.isnan(avg_rate) or np.isinf(avg_rate):
+                            pdb.set_trace()
+                        t += (time.time() - start)
+                        sum_rate.append( batch_rate )
+                        test_rate += -avg_rate
+
+
+                    test_rate /= test_iter
+
+                    ## Average per-iteration test time
+                    t = t / test_iter
+
+                    log = "Epoch {}/{}, Training Average Sum_rate = {:.6f}, Test Average Sum_rate = {:.6f}, " \
+                          "Training Time = {:.3f} sec, Test Time = {:.3f} sec\n"
+                    print(log.format( epoch+1, nEpoch, train_rate, test_rate, time.time() - start, t) )
                     
                     # Save model with best average sum-rate
                     if train_rate > max_rate:
@@ -161,37 +183,6 @@ def mainTrain():
 
                     
                 print( 'Training Complete' )
-
-            # Test
-            test_iter = len(test_H)       
-
-            # Restore best saved model
-            model.restore(sess,path='models/{}_c_{}/'.format(dataID, optimizer))
-
-            print( '\nUWMMSE Testing Started\n' )
-
-            t = 0.
-            test_rate = 0.0
-            sum_rate = []
-
-            for batch in range(test_iter):
-                batch_test_inputs = test_H[batch]
-                start = time.time()
-                avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs )
-                if np.isnan(avg_rate) or np.isinf(avg_rate):
-                    pdb.set_trace()
-                t += (time.time() - start)
-                sum_rate.append( batch_rate )
-                test_rate += -avg_rate
-            
-            
-            test_rate /= test_iter
-            
-            ## Average per-iteration test time   
-            t = t / test_iter
-
-            log = "Test_rate = {:.6f}, Time = {:.3f} sec\n"
-            print(log.format( test_rate, t))
 
             
 if __name__ == "__main__":

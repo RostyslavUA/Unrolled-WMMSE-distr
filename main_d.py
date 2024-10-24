@@ -61,7 +61,7 @@ batch_size = 64
 layers = 4 if exp == 'duwmmse' else 100
 
 # Number of epochs
-nEpoch = 20
+nEpoch = 3
 
     
 # Create Model Instance
@@ -140,7 +140,8 @@ def mainTrain():
                 print( '\nDUWMMSE Training Started\n' )
                 max_rate = 0.
                 train_iter = len(train_H)
-                
+                test_iter = len(test_H)
+
                 #nEpoch = 1
                 for epoch in range(nEpoch):
                     start = time.time()
@@ -158,8 +159,29 @@ def mainTrain():
                             pdb.set_trace()
                         train_rate += -step_rate
                     train_rate /= train_iter
-                    log = "Epoch {}/{}, Average Sum_rate = {:.6f}, Time = {:.3f} sec\n"
-                    print(log.format( epoch+1, nEpoch, train_rate, time.time() - start) )
+                    t = 0.
+                    test_rate = 0.0
+                    sum_rate = []
+
+                    for batch in range(test_iter):
+                        batch_test_inputs = test_H[batch]
+                        start = time.time()
+                        avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs )
+                        if np.isnan(avg_rate) or np.isinf(avg_rate):
+                            pdb.set_trace()
+                        t += (time.time() - start)
+                        sum_rate.append( batch_rate )
+                        test_rate += -avg_rate
+
+
+                    test_rate /= test_iter
+
+                    ## Average per-iteration test time
+                    t = t / test_iter
+
+                    log = "Epoch {}/{}, Training Average Sum_rate = {:.6f}, Test Average Sum_rate = {:.6f}, " \
+                          "Training Time = {:.3f} sec, Test Time = {:.3f} sec\n"
+                    print(log.format( epoch+1, nEpoch, train_rate, test_rate, time.time() - start, t) )
                     
                     # Save model with best average sum-rate
                     if train_rate > max_rate:
@@ -172,37 +194,6 @@ def mainTrain():
 
                     
                 print( 'Training Complete' )
-
-            # Test
-            test_iter = len(test_H)       
-
-            # Restore best saved model
-            model.restore(sess,path='models/{}_d_{}/'.format(dataID, optimizer))
-
-            print( '\nDUWMMSE Testing Started\n' )
-
-            t = 0.
-            test_rate = 0.0
-            sum_rate = []
-
-            for batch in range(test_iter):
-                batch_test_inputs = test_H[batch]
-                start = time.time()
-                avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs )
-                if np.isnan(avg_rate) or np.isinf(avg_rate):
-                    pdb.set_trace()
-                t += (time.time() - start)
-                sum_rate.append( batch_rate )
-                test_rate += -avg_rate
-            
-            
-            test_rate /= test_iter
-            
-            ## Average per-iteration test time   
-            t = t / test_iter
-
-            log = "Test_rate = {:.6f}, Time = {:.3f} sec\n"
-            print(log.format( test_rate, t))
 
 
 if __name__ == "__main__":
