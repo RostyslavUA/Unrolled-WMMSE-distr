@@ -16,7 +16,7 @@ np.random.seed(0)
 
 # Eperiment
 dataID = sys.argv[1]
-dataID = 'set'+str(dataID)
+dataID = 'set'+str(dataID)+'_v2'
 
 # Number of nodes
 nNodes = 25
@@ -93,75 +93,6 @@ def generate_data(batch_size, alpha, A, nNodes):
     return( dict(zip(['train_H', 'test_H'],[tr_H, te_H] ) ) )
 
 
-def pl_uma_nlos_optional(batch_size, dist, fc=10):
-    sigma_sf = 7.8  # dB
-    path_loss = 32.4 + 20*np.log10(fc) + 30*np.log10(dist)
-    shadow_fading = np.random.lognormal(0, sigma_sf, [batch_size, *path_loss.shape])
-    path_loss = path_loss[np.newaxis] + shadow_fading
-    return path_loss
-
-
-def get_adj(sample, thr=0.0005):
-    adj_0 = np.ones_like(sample)
-    adj_0[sample > thr] = 0.0
-    adj_0 += adj_0.T
-    adj_0 = np.divide(adj_0, adj_0, out=np.zeros_like(adj_0), where=adj_0 != 0)
-    np.fill_diagonal(adj_0, 1.0)
-    return adj_0
-
-
-def generate_csi_and_operators(dataset_size, batch_size, dist, plot_save=False):
-    tr_H, tr_adj, tr_cmat = [], [], []
-    batch_H, batch_adj, batch_cmat = [], [], []
-    i = 0
-    while True:
-        # sample training data
-        # H = pl_uma_nlos_optional(1, dist)
-        H = sample_graph(1, dist)
-        H = np.squeeze(H, 0)
-        adj = get_adj(H)
-        cmat = consensus_matrix(adj)[1]
-        adj = sp.csr_matrix(adj)
-        if nx.is_connected(nx.Graph(adj)):
-            batch_H.append(H)
-            batch_adj.append(adj)
-            batch_cmat.append(cmat)
-            if plot_save:
-                g = nx.Graph(adj)
-                g.remove_edges_from(nx.selfloop_edges(g))
-                if i == 0:
-                    pos = nx.spring_layout(g)
-                nx.draw_networkx(g, pos=pos)
-                print(i)
-                plt.savefig(f'output/fig/{i}.jpg')
-                plt.clf()
-                if i == 20:
-                    import sys; sys.exit(0)
-            if len(tr_H)/5*dataset_size % dataset_size == 0 and i == 0:
-                print(len(tr_H)/dataset_size)
-            i += 1
-            if i == batch_size:
-                i = 0
-                batch_adj = sp.block_diag(batch_adj)
-                batch_cmat = sp.block_diag(batch_cmat)
-                tr_H.append(batch_H)
-                tr_adj.append(batch_adj)
-                tr_cmat.append(batch_cmat)
-                batch_H, batch_adj, batch_cmat = [], [], []
-        if len(tr_H) == dataset_size-1:
-            break
-    return tr_H, tr_adj, tr_cmat
-
-
-def generate_training_data(batch_size, dist):
-    tr_H, tr_adj, tr_cmat = generate_csi_and_operators(tr_iter, batch_size, dist)
-    te_H, te_adj, te_cmat = generate_csi_and_operators(te_iter, batch_size, dist)
-    data_H = dict(zip(['train_H', 'test_H'],[tr_H, te_H]))
-    data_adj = dict(zip(['train_adj', 'test_adj'],[tr_adj, te_adj]))
-    data_cmat = dict(zip(['train_cmat', 'test_cmat'],[tr_cmat, te_cmat]))
-    return data_H, data_adj, data_cmat
-
-
 def main():
     coord, A, dist = build_adhoc_network( nNodes )
     
@@ -180,15 +111,9 @@ def main():
     f.close()
     
     # Training data
-    data_H, data_adj, data_cmat = generate_training_data(batch_size, A)
+    data_H = generate_data(batch_size, alpha, A, nNodes)
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
-    f.close()
-    f = open('data/'+dataID+'/adj_csr.pkl', 'wb')
-    pickle.dump(data_adj, f)
-    f.close()
-    f = open('data/'+dataID+'/cmat_csr.pkl', 'wb')
-    pickle.dump(data_cmat, f)
     f.close()
 
 
