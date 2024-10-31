@@ -1,5 +1,5 @@
 # DUWMMSE
-Tensorflow implementation of Distributed Unfolding WMMSE using Graph Neural Networks for Efficient Power Allocation (https://arxiv.org/abs/2009.10812)
+Tensorflow implementation of Distributed Unfolding WMMSE using Graph Neural Networks for Efficient Power Allocation TODO: add link to the paper
 
 ## Overview
 This library contains a Tensorflow implementation of Distributed Unfolding WMMSE using Graph Neural Networks for Efficient Power Allocation as presented in TODO: add link to the paper.
