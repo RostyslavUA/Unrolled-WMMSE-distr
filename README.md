@@ -11,12 +11,12 @@ This library contains a Tensorflow implementation of Distributed Unfolding WMMSE
 * **matplotlib**
 
 ## Structure
-* [datagen](https://github.com/RostyslavUA/Unrolled-WMMSE/blob/master/datagen.py): Code to generate dataset. Generates A.pkl ( Geometric graph ), H.pkl ( Dictionary containing train_H and test_H ) and coordinates.pkl ( node position coordinates ).  Run as *python3 datagen.py* \[dataset ID\]. User chosen \[dataset ID\] will be used as the foldername to store dataset. Eg., to generate dataset with ID *set1*, run *python3 datagen.py set1*.
-* [data](https://github.com/RostyslavUA/Unrolled-WMMSE/tree/master/data): should contain your dataset in folder \[dataset ID\]. 
-* [main](https://github.com/RostyslavUA/Unrolled-WMMSE/blob/master/main.py): Main code for running the centralized training. Run as *python3 main.py* \[dataset ID\] \[exp ID\] \[mode\]. Eg., to train UWMMSE on dataset with ID set1, run *python3 main.py set1 uwmmse train*.
-* [main_d](https://github.com/RostyslavUA/Unrolled-WMMSE/blob/master/main.py): Main code for running the distributed training. Run as *python3 main_d.py* \[dataset ID\] \[exp ID\] \[mode\]. Eg., to train DUWMMSE on dataset with ID set1, run *python3 main_d.py set1 duwmmse train*.
-* [model](https://github.com/RostyslavUA/Unrolled-WMMSE/blob/master/model.py): Defines the DUWMMSE and UWMMSE models.
-* [models](https://github.com/RostyslavUA/Unrolled-WMMSE/tree/master/models): Stores trained models in a folder with same name as \[dataset ID\].
+* [datagen](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/blob/master/datagen.py): Code to generate dataset. Generates A.pkl ( Geometric graph ), H.pkl ( Dictionary containing train_H and test_H ) and coordinates.pkl ( node position coordinates ).  Run as *python3 datagen.py* \[dataset ID\]. User chosen \[dataset ID\] will be used as the foldername to store dataset. Eg., to generate dataset with ID *set1*, run *python3 datagen.py set1*.
+* [data](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/tree/master/data): should contain your dataset in folder \[dataset ID\]. 
+* [main](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/blob/master/main.py): Main code for running the centralized training. Run as *python3 main.py* \[dataset ID\] \[exp ID\] \[mode\]. Eg., to train UWMMSE on dataset with ID set1, run *python3 main.py set1 uwmmse train*.
+* [main_d](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/blob/master/main.py): Main code for running the distributed training. Run as *python3 main_d.py* \[dataset ID\] \[exp ID\] \[mode\]. Eg., to train DUWMMSE on dataset with ID set1, run *python3 main_d.py set1 duwmmse train*.
+* [model](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/blob/master/model.py): Defines the DUWMMSE and UWMMSE models.
+* [models](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/tree/master/models): Stores trained models in a folder with same name as \[dataset ID\].
 RostyslavUA
 ## Usage
 
