@@ -16,7 +16,7 @@ np.random.seed(0)
 
 # Eperiment
 dataID = sys.argv[1]
-dataID = 'set'+str(dataID)+'_v2'
+dataID = 'set'+str(dataID)+'_dynamic'
 
 # Number of nodes
 nNodes = 25
@@ -86,8 +86,9 @@ def generate_data(batch_size, alpha, A, nNodes):
         tr_H.append( H )
 
     for indx in range(te_iter):
-        # sample test data 
-        H = sample_graph(batch_size, A, alpha )
+        # sample test data
+        A_dynamic = build_adhoc_network( nNodes )[1]
+        H = sample_graph(batch_size, A_dynamic, alpha )
         te_H.append( H )
 
     return( dict(zip(['train_H', 'test_H'],[tr_H, te_H] ) ) )
@@ -99,16 +100,6 @@ def main():
     # Create data path
     if not os.path.exists('data/'+dataID):
         os.makedirs('data/'+dataID)
-
-    # Coordinates of nodes
-    f = open('data/'+dataID+'/coordinates.pkl', 'wb')  
-    pickle.dump(coord, f)         
-    f.close()
-
-    # Geometric graph
-    f = open('data/'+dataID+'/A.pkl', 'wb')  
-    pickle.dump(A, f)          
-    f.close()
     
     # Training data
     data_H = generate_data(batch_size, alpha, A, nNodes)
