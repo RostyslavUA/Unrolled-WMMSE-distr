@@ -4,13 +4,8 @@ from __future__ import print_function
 
 import os
 import sys
-import pdb
 import pickle
 import numpy as np
-import scipy.sparse as sp
-import networkx as nx
-import matplotlib.pyplot as plt
-from utils import consensus_matrix
 
 np.random.seed(0)
 
@@ -76,13 +71,14 @@ def sample_graph(batch_size, A, alpha=1):
     return PP[0]
 
 # Training Data
-def generate_data(batch_size, alpha, A, nNodes):
+def generate_data(batch_size, alpha, nNodes):
     tr_H = []
     te_H = []
     
     for indx in range(tr_iter):
-        # sample training data 
-        H = sample_graph(batch_size, A, alpha )
+        # sample training data
+        A_dynamic = build_adhoc_network( nNodes )[1]
+        H = sample_graph(batch_size, A_dynamic, alpha )
         tr_H.append( H )
 
     for indx in range(te_iter):
@@ -95,14 +91,14 @@ def generate_data(batch_size, alpha, A, nNodes):
 
 
 def main():
-    coord, A, dist = build_adhoc_network( nNodes )
+    # coord, A, dist = build_adhoc_network( nNodes )
     
     # Create data path
     if not os.path.exists('data/'+dataID):
         os.makedirs('data/'+dataID)
     
     # Training data
-    data_H = generate_data(batch_size, alpha, A, nNodes)
+    data_H = generate_data(batch_size, alpha, nNodes)
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
     f.close()
