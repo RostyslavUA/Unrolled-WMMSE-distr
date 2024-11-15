@@ -41,9 +41,9 @@ if len( sys.argv ) > 3:
 if len(sys.argv) > 4:
     optimizer = sys.argv[4]
 if len(sys.argv) > 5:
-    dropout_op = float(sys.argv[5])
+    learning_rate = float(sys.argv[5])
 if len(sys.argv) > 6:
-    learning_rate = float(sys.argv[6])
+    max_gradient_norm = float(sys.argv[6])
 # Maximum available power at each node
 Pmax = 1.0
 
@@ -61,15 +61,15 @@ batch_size = 64
 layers = 4 if exp == 'duwmmse' else 100
 
 # Number of epochs
-nEpoch = 3
+nEpoch = 200
 
     
 # Create Model Instance
-def create_model( session, exp='duwmmse', nNodes=None, grad_subsample_p = 0.0, dropout_op=0.0):
+def create_model( session, exp='duwmmse', nNodes=None, grad_subsample_p = 0.0, dropout_op=0.0, max_gradient_norm=None):
     # Create
     model = DUWMMSE( nNodes, Pmax=Pmax, var=var, feature_dim=feature_dim, batch_size=batch_size, layers=layers,
                      learning_rate=learning_rate, exp=exp, optimizer=optimizer, grad_subsample_p=grad_subsample_p,
-                     dropout_op=dropout_op)
+                     dropout_op=dropout_op, max_gradient_norm=max_gradient_norm)
 
     # Initialize variables ( To train from scratch )
     session.run(tf.compat.v1.global_variables_initializer())
@@ -130,7 +130,7 @@ def mainTrain():
         else:
             
             # Create model
-            model = create_model(sess, exp, nNodes, grad_subsample_p, dropout_op)
+            model = create_model(sess, exp, nNodes, grad_subsample_p, dropout_op, max_gradient_norm=max_gradient_norm)
             if mode == 'train':
                 # Create model path
                 if not os.path.exists('models/'+dataID):

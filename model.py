@@ -290,6 +290,9 @@ class DUWMMSE(object):
             # Clip gradients by a given maximum_gradient_norm
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
             clip_gradients = gradients
+            if self.max_gradient_norm is not None:
+                clip_gradients = [tf.clip_by_norm(grad, self.max_gradient_norm, axes=[0, 2, 3]) if len(grad.shape) == 4
+                                  else grad for grad in clip_gradients]
             if self.grad_subsample_p != 0.0:
                 bern_pq = tf.repeat(tf.constant([[self.grad_subsample_p, 1-self.grad_subsample_p]],
                                                             dtype=tf.float64),
@@ -594,6 +597,9 @@ class UWMMSE(object):
             # Clip gradients by a given maximum_gradient_norm
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
             clip_gradients = gradients
+            if self.max_gradient_norm is not None:
+                clip_gradients = [tf.clip_by_norm(grad, self.max_gradient_norm, axes=[0, 2, 3]) if len(grad.shape) == 4
+                                  else grad for grad in clip_gradients]
 
             # Update the model
             self.updates = self.opt.apply_gradients(
