@@ -34,6 +34,7 @@ dataID = sys.argv[1]
 exp = sys.argv[2]
 dropout_op = 0.0
 learning_rate = 1e-3
+max_gradient_norm = None
 if len(sys.argv) > 3:
     mode = sys.argv[3]
 if len(sys.argv) > 4:
