@@ -27,7 +27,8 @@ def dropout(inputs, rate=0.0):
 class DUWMMSE(object):
         # Initialize
         def __init__( self, nNodes, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3,
-                      max_gradient_norm=5.0, exp='duwmmse', optimizer='adam', grad_subsample_p=0.0, dropout_op=0.0):
+                      max_gradient_norm=5.0, exp='duwmmse', optimizer='adam', grad_subsample_p=0.0, dropout_op=0.0,
+                      reg_constant=0.0):
             self.nNodes = nNodes
             self.Pmax              = tf.cast( Pmax, tf.float64 )
             self.var               = var
@@ -41,6 +42,7 @@ class DUWMMSE(object):
             self.optimizer = optimizer
             self.grad_subsample_p = grad_subsample_p
             self.dropout_op = dropout_op
+            self.reg_constant = reg_constant
             self.build_model()
 
         # Build Model
@@ -284,6 +286,10 @@ class DUWMMSE(object):
             elif self.optimizer == 'gd':
                 self.opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
 
+            # Add regularization for stability
+            l2_reg = tf.reduce_sum([tf.nn.l2_loss(par) for par in self.trainable_params])
+            self.obj += self.reg_constant*l2_reg
+
             # Compute gradients of loss w.r.t. all trainable variables
             gradients = tf.gradients(self.obj, self.trainable_params)
 
@@ -353,7 +359,7 @@ class DUWMMSE(object):
 class UWMMSE(object):
         # Initialize
         def __init__( self, Pmax=1., var=7e-10, feature_dim=3, batch_size=64, layers=4, learning_rate=1e-3,
-                      max_gradient_norm=5.0, exp='uwmmse', optimizer='adam', dropout_op=0.0):
+                      max_gradient_norm=5.0, exp='uwmmse', optimizer='adam', dropout_op=0.0, reg_constant=0.0):
             self.Pmax              = tf.cast( Pmax, tf.float64 )
             self.var               = var
             self.feature_dim       = feature_dim
@@ -365,6 +371,7 @@ class UWMMSE(object):
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
             self.optimizer = optimizer
             self.dropout_op = dropout_op
+            self.reg_constant = reg_constant
             self.build_model()
 
         # Build Model
@@ -590,6 +597,10 @@ class UWMMSE(object):
                 self.opt = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate)
             elif self.optimizer == 'gd':
                 self.opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+
+            # Add regularization for stability
+            l2_reg = tf.reduce_sum([tf.nn.l2_loss(par) for par in self.trainable_params])
+            self.obj += self.reg_constant*l2_reg
 
             # Compute gradients of loss w.r.t. all trainable variables
             gradients = tf.gradients(self.obj, self.trainable_params)
