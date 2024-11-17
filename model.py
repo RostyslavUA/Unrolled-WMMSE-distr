@@ -286,8 +286,9 @@ class DUWMMSE(object):
             elif self.optimizer == 'gd':
                 self.opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
 
-            # Add regularization for stability
-            l2_reg = tf.reduce_sum([tf.nn.l2_loss(par) for par in self.trainable_params])
+            # Add regularization for stability. Notice: parameters contain centralized parameter mu.
+            l2_reg = tf.reduce_sum([tf.reduce_sum(par**2, (0, 2, 3)) if len(par.shape) > 0 else
+                                    tf.repeat((par**2)[tf.newaxis], self.nNodes, 0) for par in self.trainable_params])
             self.obj += self.reg_constant*l2_reg
 
             # Compute gradients of loss w.r.t. all trainable variables
