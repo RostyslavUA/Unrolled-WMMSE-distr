@@ -38,18 +38,24 @@ tr_iter = 100
 te_iter = 100
 
 
-# Build random geometric graph
-def build_adhoc_network(nNodes, area=1000, r=1.0, pl=2.2):
-    adj_mtx, d_mtx, xys = weighted_poisson_graph(nNodes, area, radius=r)
-    d_mtx[d_mtx < 10] = 10
-    d_mtx[d_mtx > 5000] = 5000
-    pl_nlos_umi_lin = gen_pl_nlos_umi(d_mtx, gamma=pl)
-    h_nlos_umi_lin = 1/pl_nlos_umi_lin
-    pl_nlos_umi = 10*np.log10(pl_nlos_umi_lin)
-    adj_mtx[pl_nlos_umi >= 85] = 0.0
-    adj_mtx *= adj_mtx.T
-    g = nx.from_numpy_matrix(adj_mtx)
-    return h_nlos_umi_lin, adj_mtx, g
+def build_adhoc_network( nNodes, xy_lim=500, pl0=40, d0=10, gamma=3.0, std=7.0):
+    # Define square of 1km x 1km
+    # Generate coordinates for transmitters
+    transmitters = np.random.uniform(low=-xy_lim, high=xy_lim, size=(nNodes,2))
+    # Generate random radius for intended receivers
+    r_vec = np.random.uniform(low=10, high=200, size=(nNodes,1))
+    a_vec = np.random.uniform(low=0, high=360, size=(nNodes,1))
+    # Calculate random delta coordinates for intended receivers
+    xy_delta = np.zeros_like(transmitters)
+    xy_delta[:, 0] = r_vec * np.sin(a_vec)
+    xy_delta[:, 1] = r_vec * np.cos(a_vec)
+    receivers = transmitters + xy_delta
+
+    # Calculate the distance matrix between all pairs of transmitters and receivers
+    d_mtx = distance_matrix(transmitters, receivers)
+    h_mtx = lognormal_pathloss(d_mtx, pl0=pl0, d0=d0, gamma=gamma, std=std)
+
+    return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx, d_mtx )
 
 
 def rician_distribution(batch_size, alpha):
@@ -126,8 +132,8 @@ def gen_pl_nlos_umi(dist, fc=5.8, c=3e8, hbs=1.7, hut=1.7, gamma=3.0):
     # rx_sig = 0 - pl_umi_nlos - noise_power  # dB
     # poor_channels = np.where(rx_sig < snr_req)  # typically a few values
     # plt.hist(rx_sig.flatten(), bins=100)
-    # plt.xlabel('bins')
-    # plt.ylabel('RSS, dB')
+    # plt.xlabel('RSS, dB')
+    # plt.ylabel('hits')
     # plt.grid()
     # plt.show()
     return pl_umi_nlos_lin
