@@ -39,11 +39,15 @@ te_iter = 100
 
 
 def build_adhoc_network( nNodes, xy_lim=500, pl0=40, d0=10, gamma=3.0, std=7.0):
-    # Define square of 1km x 1km
+    # Define circle 1km diameter
     # Generate coordinates for transmitters
-    transmitters = np.random.uniform(low=-xy_lim, high=xy_lim, size=(nNodes,2))
+    tx_r = np.random.uniform(low=-xy_lim, high=xy_lim, size=nNodes)
+    angle = np.random.uniform(low=0, high=2*np.pi, size=nNodes)
+    transmitters = np.zeros((nNodes, 2))
+    transmitters[:, 0] = tx_r*np.cos(angle)
+    transmitters[:, 1] = tx_r*np.sin(angle)
     # Generate random radius for intended receivers
-    r_vec = np.random.uniform(low=10, high=200, size=nNodes)
+    r_vec = np.random.uniform(low=10, high=100, size=nNodes)
     a_vec = np.random.uniform(low=0, high=360, size=nNodes)
     # Calculate random delta coordinates for intended receivers
     xy_delta = np.zeros_like(transmitters)
@@ -53,7 +57,8 @@ def build_adhoc_network( nNodes, xy_lim=500, pl0=40, d0=10, gamma=3.0, std=7.0):
 
     # Calculate the distance matrix between all pairs of transmitters and receivers
     d_mtx = distance_matrix(transmitters, receivers)
-    pl0 = gen_pl_umi_nlos(d_mtx, fc=2.4, c=3e8, hbs=1.7, hut=1.7, gamma=gamma)
+    fc = 0.9  # GHz
+    pl0 = gen_pl_uma_optional(fc, d_mtx)
     h_mtx = lognormal_pathloss(d_mtx, pl0=pl0, d0=d0, gamma=gamma, std=std)
     return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx, d_mtx )
 
@@ -76,6 +81,18 @@ def sample_graph(batch_size, A, alpha=1):
     PP = samples[None,:,:] * A
     return PP[0]
 
+
+def get_adj(H, n=25):
+    adj = np.zeros_like(H)
+    for b, H_b in enumerate(H):
+        adj_b = np.zeros_like(H_b)
+        flat_indices = np.argpartition(H_b.flatten(), -n)[-n:]  # pick n transmitter-receiver pairs
+        row_indices, col_indices = np.unravel_index(flat_indices, H_b.shape)
+        adj_b[row_indices, col_indices] = 1.0
+        adj[b] = adj_b
+    return adj
+
+
 # Training Data
 def generate_data(batch_size, alpha, nNodes):
     tr_H, tr_adj = [], []
@@ -83,20 +100,24 @@ def generate_data(batch_size, alpha, nNodes):
     indx_tr, indx_te = 0, 0
     while indx_tr < tr_iter:
         # sample training data
-        coord, h_mtx, d_mtx = build_adhoc_network( nNodes, xy_lim=500, pl0=40, d0=10, gamma=2.0, std=7.82)
+        coord, h_mtx, d_mtx = build_adhoc_network( nNodes, xy_lim=500, pl0=None, d0=10, gamma=3.0, std=6.0)
         H = sample_graph(batch_size, h_mtx, alpha )
+        adj = get_adj(H, n=25)  # pick 25 transmitter-receiver pairs; disconnected graphs
         tr_H.append( H )
+        tr_adj.append(adj)
         indx_tr += 1
         # hist_pl(1/h_mtx)
 
     while indx_te < te_iter:
         # sample test data
-        coord, h_mtx, d_mtx = build_adhoc_network( nNodes, xy_lim=500, pl0=40, d0=10, gamma=2.0, std=7.82)
+        coord, h_mtx, d_mtx = build_adhoc_network( nNodes, xy_lim=500, pl0=None, d0=10, gamma=3.0, std=6.0)
         H = sample_graph(batch_size, h_mtx, alpha )
+        adj = get_adj(H, n=25)
         te_H.append( H )
+        te_adj.append(adj)
         indx_te += 1
 
-    return( dict(zip(['train_H', 'test_H'],[tr_H, te_H] ) ), )
+    return( dict(zip(['train_H', 'test_H'],[tr_H, te_H] ) ), dict(zip(['train_adj', 'test_adj'],[tr_adj, te_adj] ) ))
 
 
 def gen_pl_umi_nlos(dist, fc=5.8, c=3e8, hbs=1.7, hut=1.7, gamma=3.0):
@@ -115,19 +136,9 @@ def gen_pl_umi_nlos(dist, fc=5.8, c=3e8, hbs=1.7, hut=1.7, gamma=3.0):
     return pl_umi_nlos
 
 
-def weighted_poisson_graph(N, area, radius=1.0):
-    """
-    Create a Poisson point process 2D graph
-    """
-    # N = np.random.poisson(lam=area*density)
-    lenth_a = np.sqrt(area)
-    xys = np.random.uniform(0, lenth_a, (N, 2))
-    d_mtx = distance_matrix(xys, xys)
-    adj_mtx = np.zeros([N, N], dtype=int)
-    adj_mtx[d_mtx <= radius] = 1
-    np.fill_diagonal(adj_mtx, 0)
-    # graph = nx.from_numpy_matrix(adj_mtx)
-    return adj_mtx, d_mtx, xys
+def gen_pl_uma_optional(fc, d_mtx):
+    pl = 32.4 + 20*np.log10(fc) + 30*np.log10(d_mtx)
+    return pl
 
 
 def lognormal_pathloss(d_mtx, pl0=40, d0=10, gamma=3.0, std=7.0):
@@ -155,9 +166,10 @@ def hist_pl(pl_umi_nlos_lin):
     T = 290  # Kelvin
     bw = 5e6
     noise_power_lin = k*T*bw
-    noise_power = 10*np.log10(noise_power_lin)  # dB
-    snr_req = 30  # dB
-    rx_sig = 0 - pl_umi_nlos - noise_power  # dB
+    noise_power = 10*np.log10(noise_power_lin) + 30 # dBm
+    snr_req = 10  # dB
+    tx_sig = 10*np.log10(5/1e-3)  # dBm
+    rx_sig = tx_sig - pl_umi_nlos - noise_power  # dB
     poor_channels = np.where(rx_sig < snr_req)  # path loss is very high due to large distance. Many poor channels
     plt.hist(rx_sig.flatten(), bins=100)
     plt.xlabel('RSS, dB')
@@ -173,13 +185,13 @@ def main():
         os.makedirs('data/'+dataID)
 
     # Training data
-    data_H = generate_data(batch_size, alpha, nNodes)
+    data_H, data_adj = generate_data(batch_size, alpha, nNodes)
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
     f.close()
-    # f = open('data/'+dataID+'/adj.pkl', 'wb')
-    # pickle.dump(data_adj, f)
-    # f.close()
+    f = open('data/'+dataID+'/adj.pkl', 'wb')
+    pickle.dump(data_adj, f)
+    f.close()
 
 
 if __name__ == '__main__':
