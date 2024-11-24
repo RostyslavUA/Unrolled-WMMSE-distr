@@ -286,10 +286,6 @@ class DUWMMSE(object):
             elif self.optimizer == 'gd':
                 self.opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
 
-            # Add regularization for stability
-            l2_reg = tf.reduce_sum([tf.nn.l2_loss(par) for par in self.trainable_params])
-            self.obj += self.reg_constant*l2_reg
-
             # Compute gradients of loss w.r.t. all trainable variables
             gradients = tf.gradients(self.obj, self.trainable_params)
 
@@ -601,13 +597,10 @@ class UWMMSE(object):
                 self.opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
 
             # Add regularization for stability
-            l2_reg = tf.reduce_sum([tf.nn.l2_loss(par) for par in self.trainable_params])
             var_reg = tf.reduce_sum(tf.norm(self.pow_alloc - tf.reduce_mean(self.pow_alloc, 0), axis=0)**2)
-            self.obj += self.reg_constant*l2_reg
-            var_constant = 0.001
 
             # Compute gradients of loss w.r.t. all trainable variables
-            gradients = tf.gradients(self.obj + var_constant*var_reg, self.trainable_params)
+            gradients = tf.gradients(self.obj + self.reg_constant*var_reg, self.trainable_params)
             self.gradients = gradients
             # Clip gradients by a given maximum_gradient_norm
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
