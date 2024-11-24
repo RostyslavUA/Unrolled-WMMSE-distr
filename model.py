@@ -415,7 +415,8 @@ class UWMMSE(object):
             V = Vmax * tf.ones([self.batch_size, self.nNodes], dtype=tf.float64)
             
             self.pow_alloc = []
-            
+            self.W_wmmses = []
+            self.Ws = []
             # Iterate over layers l
             for l in range(self.layers):
                 #with tf.variable_scope('Layer{}'.format(l+1)):
@@ -434,7 +435,8 @@ class UWMMSE(object):
 
                     # Compute Wcap^l = a^l * W^l + b^l
                     W = tf.math.add( tf.math.multiply( a, W_wmmse ), b )
-                    
+                    self.W_wmmses.append(W_wmmse)
+                    self.Ws.append(W)
                     # Learn mu^l
                     #mu = tf.get_variable( name='mu', initializer=tf.constant(0., shape=(), dtype=tf.float64))
                     mu = tf.compat.v1.get_variable( name='mu', initializer=tf.constant(0., shape=(), dtype=tf.float64))
@@ -600,11 +602,13 @@ class UWMMSE(object):
 
             # Add regularization for stability
             l2_reg = tf.reduce_sum([tf.nn.l2_loss(par) for par in self.trainable_params])
+            var_reg = tf.reduce_sum(tf.norm(self.pow_alloc - tf.reduce_mean(self.pow_alloc, 0), axis=0)**2)
             self.obj += self.reg_constant*l2_reg
+            var_constant = 0.001
 
             # Compute gradients of loss w.r.t. all trainable variables
-            gradients = tf.gradients(self.obj, self.trainable_params)
-
+            gradients = tf.gradients(self.obj + var_constant*var_reg, self.trainable_params)
+            self.gradients = gradients
             # Clip gradients by a given maximum_gradient_norm
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
             clip_gradients = gradients
