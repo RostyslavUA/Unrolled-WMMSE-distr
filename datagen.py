@@ -25,6 +25,9 @@ pl = 2.2
 # Channel
 channel = 'nlos'
 
+# Thresholding
+threshold = True
+
 # Rayleigh (NLOS) or Rician(LOS) distribution scale
 alpha = 1/np.sqrt(2)
 
@@ -71,8 +74,7 @@ def build_adhoc_network(coord, pars, batch_size):
         x_g = np.clip(x_g, 0-2*std, 0+2*std)
         h_mtx_db[b, :, :] = pl_no_shadowing + x_g  # 64 instances of path loss with lognormal shadowing for each location realization
     h_mtx_lin = 10.0 ** (-h_mtx_db/10.0)
-    pl_mtx = None
-    return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx_lin, pl_mtx, d_mtx )
+    return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx_lin, h_mtx_db, d_mtx )
 
 
 def rician_distribution(batch_size, alpha):
@@ -86,7 +88,7 @@ def rician_distribution(batch_size, alpha):
 # Simuate Fading
 def sample_graph(batch_size, A, alpha=1):
     if channel == 'nlos':
-        samples = np.random.rayleigh(alpha, (batch_size, nNodes, nNodes))
+        samples = np.random.rayleigh(alpha, A.shape)
     elif channel == 'los':
         samples = rician_distribution(batch_size, alpha)
     #samples = (samples + np.transpose(samples,(0,2,1)))/2
@@ -110,7 +112,7 @@ def gen_threshold():
 
 
 # Training Data
-def generate_data(batch_size, alpha, nNodes):
+def generate_data(batch_size, alpha, nNodes, threshold=False):
     pars = {
         "fc": 0.9,  # GHz
         "std": 7.2
@@ -121,14 +123,13 @@ def generate_data(batch_size, alpha, nNodes):
         # sample training data
         transmitters, receivers = gen_location(xy_lim=500, nNodes=nNodes)
         # Generate dict of coordinates, gain (linear), path loss (dB) and distance matrix
-        coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
+        coord, h_mtx_lin, h_mtx_db, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
         # Apply Rayleigh fading with parameter alpha
         H = sample_graph(batch_size, h_mtx_lin, alpha )
         # Threshold unintended receivers
-        H_thr = np.copy(H)
-        H_thr[H < thr_gain_lin] = 0.0
-        tr_H.append( H_thr )
-        # hist_pl(1/h_mtx)
+        if threshold:
+            H[H < thr_gain_lin] = 0.0
+        tr_H.append( H )
 
     for indx in range(te_iter):
         # sample test data
@@ -138,9 +139,9 @@ def generate_data(batch_size, alpha, nNodes):
         # Apply Rayleigh fading with parameter alpha
         H = sample_graph(batch_size, h_mtx_lin, alpha )
         # Threshold unintended receivers
-        H_thr = np.copy(H)
-        H_thr[H < thr_gain_lin] = 0.0
-        te_H.append( H_thr )
+        if threshold:
+            H[H < thr_gain_lin] = 0.0
+        te_H.append( H )
 
     return( dict(zip(['train_H', 'test_H'],[tr_H, te_H] ) ) )
 
@@ -222,6 +223,20 @@ def hist_pl(pl_umi_nlos_lin):
     plt.show()
 
 
+def scatter_channel_gain(d_mtcs, tr_H, n_samp):
+    samp_idx = np.random.randint(0, tr_H.shape[1], size=n_samp)
+    d_mtcs_flat = np.array(d_mtcs).flatten()
+    tr_H_samp = np.array(tr_H)[range(tr_iter), samp_idx, :]
+    tr_H_flat = tr_H_samp.flatten()
+    plt.scatter(d_mtcs_flat, 10*np.log10(tr_H_flat))
+    ax = plt.gca()
+    ax.set_xscale('log')
+    plt.xlabel('distance')
+    plt.ylabel(r'$H_{dB}$')
+    plt.grid()
+    plt.show()
+
+
 
 def main():
     # Create data path
@@ -229,7 +244,7 @@ def main():
         os.makedirs('data/'+dataID)
 
     # Training data
-    data_H = generate_data(batch_size, alpha, nNodes)
+    data_H = generate_data(batch_size, alpha, nNodes, threshold)
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
     f.close()
