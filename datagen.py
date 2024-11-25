@@ -115,7 +115,7 @@ def generate_data(batch_size, alpha, nNodes):
         "fc": 0.9,  # GHz
         "d0": 10,  # m
         "gamma": 3.0,
-        "std": 6.0
+        "std": 7.2
     }
     tr_H, te_H = [], []
     thr_gain_lin = gen_threshold()
@@ -170,6 +170,25 @@ def gen_pl_umi_nlos(dist, fc=5.8, c=3e8, hbs=1.7, hut=1.7, gamma=3.0):
 def gen_pl_uma_optional(fc, d_mtx):
     pl = 32.4 + 20*np.log10(fc) + 30*np.log10(d_mtx)
     return pl
+
+
+def gen_pl_uma_nlos(fc, d_mtx, c=3e8, hbs=1.7, hut=1.7, d0=10, gamma=3.0):
+    he = 1.0
+    # Compute breakpoint distance
+    dbp = 4*(hbs-he)*(hut-he)*fc*1e9/c
+    # Distance-dependent LOS path losses
+    pl1 = 28.0 + 22*np.log10(d_mtx) + 20*np.log10(fc)
+    pl2 = 28.0 + 40*np.log10(d_mtx) + 20*np.log10(fc) - 9*np.log10(dbp**2 - (hbs-hut)**2)
+    pl_uma_los = np.zeros_like(d_mtx)
+    pl_uma_los[d_mtx < dbp] = pl1[d_mtx < dbp]
+    pl_uma_los[d_mtx >= dbp] = pl2[d_mtx >= dbp]
+    # Log normal shadowing
+    h_mtx_lin = lognormal_pathloss(d_mtx, pl0=pl_uma_los, d0=d0, gamma=gamma, std=4.0)
+    pl_uma_los = -10*np.log10(h_mtx_lin)
+    # NLOS path loss
+    pl_uma_nlos_prime = 13.54 + 39.08*np.log10(d_mtx) + 20*np.log10(fc) - 0.6*(hut - 1.5)
+    pl_uma_nlos = np.maximum(pl_uma_los, pl_uma_nlos_prime)
+    return pl_uma_nlos
 
 
 def lognormal_pathloss(d_mtx, pl0=40, d0=10, gamma=3.0, std=7.0):
