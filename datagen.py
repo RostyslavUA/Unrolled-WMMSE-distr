@@ -26,7 +26,7 @@ pl = 2.2
 channel = 'nlos'
 
 # Rayleigh (NLOS) or Rician(LOS) distribution scale
-alpha = 1
+alpha = 1/np.sqrt(2)
 
 # Batch size
 batch_size = 64
@@ -41,7 +41,7 @@ te_iter = 100
 def gen_location(xy_lim, nNodes):
     # Define circle 1km diameter
     # Generate coordinates for transmitters
-    tx_r = np.random.uniform(low=-xy_lim, high=xy_lim, size=nNodes)
+    tx_r = np.random.uniform(low=0, high=xy_lim, size=nNodes)
     angle = np.random.uniform(low=0, high=2*np.pi, size=nNodes)
     transmitters = np.zeros((nNodes, 2))
     transmitters[:, 0] = tx_r*np.cos(angle)
@@ -57,21 +57,21 @@ def gen_location(xy_lim, nNodes):
     return transmitters, receivers
 
 
-def build_adhoc_network(coord, pars):
+def build_adhoc_network(coord, pars, batch_size):
     fc = pars['fc']
-    d0 = pars['d0']
-    gamma = pars['gamma']
     std = pars['std']
     transmitters, receivers = coord
     # Calculate the distance matrix between all pairs of transmitters and receivers
     d_mtx = distance_matrix(transmitters, receivers)
-    pl0 = gen_pl_uma_optional(fc, d_mtx)
-    h_mtx_lin = []
+    pl_no_shadowing = gen_pl_uma_optional(fc, d_mtx)
+    nNodes = d_mtx.shape[0]
+    h_mtx_db = np.zeros((batch_size, nNodes, nNodes))
     for b in range(batch_size):
-        h_mtx_lin_b = lognormal_pathloss(d_mtx, pl0=pl0, d0=d0, gamma=gamma, std=std)  # 64 instances of path loss with lognormal shadowing for each location realization
-        h_mtx_lin.append(h_mtx_lin_b)
-    h_mtx_lin = np.array(h_mtx_lin)
-    pl_mtx = -10*np.log10(h_mtx_lin)
+        x_g = np.random.normal(0, std, size=d_mtx.shape)
+        x_g = np.clip(x_g, 0-2*std, 0+2*std)
+        h_mtx_db[b, :, :] = pl_no_shadowing + x_g  # 64 instances of path loss with lognormal shadowing for each location realization
+    h_mtx_lin = 10.0 ** (-h_mtx_db/10.0)
+    pl_mtx = None
     return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx_lin, pl_mtx, d_mtx )
 
 
@@ -90,7 +90,7 @@ def sample_graph(batch_size, A, alpha=1):
     elif channel == 'los':
         samples = rician_distribution(batch_size, alpha)
     #samples = (samples + np.transpose(samples,(0,2,1)))/2
-    PP = samples[None,:,:] * A
+    PP = np.multiply(samples[None,:,:], A)
     return PP[0]
 
 
@@ -100,7 +100,7 @@ def gen_threshold():
     T = 290  # Kelvin
     bw = 5e6
     noise_power_lin = k*T*bw
-    noise_power = 10*np.log10(noise_power_lin) + 30 # dBm
+    noise_power = -106.87  # dBm
     req_snr = 10  # dB
     ctt = 5  # control channel tolerance, dB
     thr_pl = tx_sig - noise_power - req_snr + ctt  # path loss threshold
@@ -113,8 +113,6 @@ def gen_threshold():
 def generate_data(batch_size, alpha, nNodes):
     pars = {
         "fc": 0.9,  # GHz
-        "d0": 10,  # m
-        "gamma": 3.0,
         "std": 7.2
     }
     tr_H, te_H = [], []
@@ -123,14 +121,12 @@ def generate_data(batch_size, alpha, nNodes):
         # sample training data
         transmitters, receivers = gen_location(xy_lim=500, nNodes=nNodes)
         # Generate dict of coordinates, gain (linear), path loss (dB) and distance matrix
-        coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars)
+        coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
         # Apply Rayleigh fading with parameter alpha
         H = sample_graph(batch_size, h_mtx_lin, alpha )
         # Threshold unintended receivers
         H_thr = np.copy(H)
         H_thr[H < thr_gain_lin] = 0.0
-        # Keep intended receivers
-        H_thr[np.arange(batch_size)[:, np.newaxis], np.arange(nNodes), np.arange(nNodes)] = H.diagonal(0, 1, 2)
         tr_H.append( H_thr )
         # hist_pl(1/h_mtx)
 
@@ -138,14 +134,12 @@ def generate_data(batch_size, alpha, nNodes):
         # sample test data
         transmitters, receivers = gen_location(xy_lim=500, nNodes=nNodes)
         # Generate dict of coordinates, gain (linear), path loss (dB) and distance matrix
-        coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars)
+        coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
         # Apply Rayleigh fading with parameter alpha
         H = sample_graph(batch_size, h_mtx_lin, alpha )
         # Threshold unintended receivers
         H_thr = np.copy(H)
         H_thr[H < thr_gain_lin] = 0.0
-        # Keep intended receivers
-        H_thr[np.arange(batch_size)[:, np.newaxis], np.arange(nNodes), np.arange(nNodes)] = H.diagonal(0, 1, 2)
         te_H.append( H_thr )
 
     return( dict(zip(['train_H', 'test_H'],[tr_H, te_H] ) ) )
