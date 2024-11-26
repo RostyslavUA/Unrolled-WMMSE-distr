@@ -41,7 +41,7 @@ tr_iter = 100
 te_iter = 100
 
 
-def gen_location(xy_lim, nNodes):
+def gen_location(xy_lim, nNodes, min_dist=10, nAttempts=100):
     # Define circle 1km diameter
     # Generate coordinates for transmitters
     tx_r = np.random.uniform(low=0, high=xy_lim, size=nNodes)
@@ -49,15 +49,19 @@ def gen_location(xy_lim, nNodes):
     transmitters = np.zeros((nNodes, 2))
     transmitters[:, 0] = tx_r*np.cos(angle)
     transmitters[:, 1] = tx_r*np.sin(angle)
-    # Generate random radius for intended receivers
-    r_vec = np.random.uniform(low=10, high=100, size=nNodes)
-    a_vec = np.random.uniform(low=0, high=360, size=nNodes)
-    # Calculate random delta coordinates for intended receivers
-    xy_delta = np.zeros_like(transmitters)
-    xy_delta[:, 0] = r_vec * np.sin(a_vec*np.pi/180)
-    xy_delta[:, 1] = r_vec * np.cos(a_vec*np.pi/180)
-    receivers = transmitters + xy_delta
-    return transmitters, receivers
+    for i in range(nAttempts):
+        # Generate random radius for intended receivers
+        r_vec = np.random.uniform(low=10, high=50, size=nNodes)
+        a_vec = np.random.uniform(low=0, high=360, size=nNodes)
+        # Calculate random delta coordinates for intended receivers
+        xy_delta = np.zeros_like(transmitters)
+        xy_delta[:, 0] = r_vec * np.sin(a_vec*np.pi/180)
+        xy_delta[:, 1] = r_vec * np.cos(a_vec*np.pi/180)
+        receivers = transmitters + xy_delta
+        if np.all(distance_matrix(transmitters, receivers) >= min_dist):
+            return transmitters, receivers
+        if i == nAttempts-1:
+            raise ValueError(f"Some receivers are closer to transmitters than required min distance {min_dist}m.")
 
 
 def build_adhoc_network(coord, pars, batch_size):
