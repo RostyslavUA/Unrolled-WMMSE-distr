@@ -235,9 +235,10 @@ class DUWMMSE(object):
 
             # sigma^2 + sum_j j ~= i ( (H_ji)^2 * (v_j)^2 )
             den = tf.reshape( tf.matmul( tf.transpose( self.Hsq, perm=[0,2,1] ), tf.reshape( tf.math.square( self.pow_alloc ), [-1, self.nNodes, 1] ) ), [-1, self.nNodes] ) + self.var - num
-
+            
+            bandwidth = 5e6
             # rate
-            rate = tf.math.log( 1. + tf.math.divide( num, den ) ) / tf.cast( tf.math.log( 2.0 ), tf.float64 )
+            rate = bandwidth*tf.math.log( 1. + tf.math.divide( num, den ) ) / tf.cast( tf.math.log( 2.0 ), tf.float64 )
 
             # Sum Rate = sum_i ( log(1 + SINR) )
             self.utility = tf.reduce_sum( rate, axis=1 )
@@ -562,8 +563,14 @@ class UWMMSE(object):
             # sigma^2 + sum_j j ~= i ( (H_ji)^2 * (v_j)^2 ) 
             den = tf.reshape( tf.matmul( tf.transpose( self.Hsq, perm=[0,2,1] ), tf.reshape( tf.math.square( self.pow_alloc ), [-1, self.nNodes, 1] ) ), [-1, self.nNodes] ) + self.var - num 
             
+            self.intf = den - self.var
+            self.sinr_num = num
+            self.sinr_den = den
+            self.sinr = tf.math.divide(num, den)
+            
+            bandwidth = 5e6
             # rate
-            rate = tf.math.log( 1. + tf.math.divide( num, den ) ) / tf.cast( tf.math.log( 2.0 ), tf.float64 )
+            rate = bandwidth*tf.math.log( 1. + self.sinr ) / tf.cast( tf.math.log( 2.0 ), tf.float64 )
             
             # Sum Rate = sum_i ( log(1 + SINR) )
             self.utility = tf.reduce_sum( rate, axis=1 )
@@ -606,7 +613,7 @@ class UWMMSE(object):
             # clip_gradients, _ = tf.clip_by_global_norm(gradients, self.max_gradient_norm)
             clip_gradients = gradients
             if self.max_gradient_norm is not None:
-                clip_gradients = [tf.clip_by_norm(grad, self.max_gradient_norm, axes=[0, 2, 3]) if len(grad.shape) == 4
+                clip_gradients = [tf.clip_by_norm(grad, self.max_gradient_norm) if len(grad.shape) > 0
                                   else grad for grad in clip_gradients]
 
             # Update the model
@@ -631,11 +638,11 @@ class UWMMSE(object):
             # Training Phase
             #input_feed[self.phase.name] = True
  
-            output_feed = [self.obj, self.utility, self.pow_alloc, self.updates]
+            output_feed = [self.obj, self.utility, self.pow_alloc, self.updates, self.sinr, self.sinr_num, self.sinr_den, self.intf]
                             
             outputs = sess.run(output_feed, input_feed)
             
-            return outputs[0], outputs[1], outputs[2]
+            return outputs[0], outputs[1], outputs[2], outputs[4], outputs[5], outputs[6], outputs[7]
 
 
         def eval(self, sess, inputs ):
