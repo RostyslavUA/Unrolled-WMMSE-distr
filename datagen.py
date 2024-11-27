@@ -8,7 +8,9 @@ import pickle
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+import scipy.sparse as sp
 from scipy.spatial import distance_matrix
+from utils import consensus_matrix
 
 np.random.seed(0)
 
@@ -18,23 +20,20 @@ dataID = sys.argv[1]
 # Number of nodes
 nNodes = 25
 
-layout = 'circle'
+layout = 'square'
 # circle radius or half of a square's side of a simulated area
-xy_lim = 200
+xy_lim = 500
 
 # Thresholding
-threshold = False
+threshold = True
 
 # Fading
-fading = False
+fading = True
 
 dataID = 'set'+str(dataID)+f'_UMa_Optional_{layout}_n{nNodes}_lim{xy_lim}_thr{int(threshold)}_fading{int(fading)}'
 
 # Path gain exponent
 pl = 2.2
-
-# Channel
-channel = 'nlos'
 
 # Rayleigh (NLOS) or Rician(LOS) distribution scale
 alpha = 1/np.sqrt(2)
@@ -43,7 +42,7 @@ alpha = 1/np.sqrt(2)
 batch_size = 64
 
 # Training iterations
-tr_iter = 100
+tr_iter = 10000
 
 # Testing iterations
 te_iter = 100
@@ -112,10 +111,7 @@ def rician_distribution(batch_size, alpha):
 
 # Simuate Fading
 def sample_graph(batch_size, A, alpha=1):
-    if channel == 'nlos':
-        samples = np.random.rayleigh(alpha, A.shape)
-    elif channel == 'los':
-        samples = rician_distribution(batch_size, alpha)
+    samples = np.random.rayleigh(alpha, A.shape)
     #samples = (samples + np.transpose(samples,(0,2,1)))/2
     PP = np.multiply(samples[None,:,:], A)
     return PP[0]
@@ -131,8 +127,7 @@ def gen_threshold():
     req_snr = 10  # dB
     ctt = 5  # control channel tolerance, dB
     thr_pl = tx_sig - noise_power - req_snr + ctt  # path loss threshold
-    thr_pl_lin = 10**(thr_pl/10)
-    thr_gain_lin = 1/thr_pl_lin
+    thr_gain_lin = 10**(-thr_pl/20)  # Divide by 20 to threshold magnitude coefficients
     return thr_gain_lin
 
 
@@ -223,6 +218,24 @@ def gen_pl_uma_nlos(fc, d_mtx, c=3e8, hbs=1.7, hut=1.7, d0=10, gamma=3.0):
     return pl_uma_nlos
 
 
+def gen_cmtx(data_H):
+    data_C = dict()
+    C = []
+    for i, H_m in enumerate(data_H['train_H']):
+        adj = np.ones_like(H_m)
+        adj[H_m == 0] = 0.0
+        adj = adj * np.transpose(adj, (0, 2, 1))
+        cmtcs = []
+        for b, adj_b in enumerate(adj):
+            cmtx = consensus_matrix(adj_b)[1]
+            cmtcs.append(cmtx)
+        cmtcs = sp.vstack(cmtcs)
+        C.append(cmtcs)
+        print(f"{i}/{len(data_H['train_H'])} mini-batch.")
+    data_C['train_cmat'] = C
+    return data_C
+
+
 def lognormal_pathloss(d_mtx, pl0=40, d0=10, gamma=3.0, std=7.0):
     '''
     PL = PL_0 + 10 \gamma \log_{10}\frac{d}{d_0} + X_g
@@ -285,9 +298,11 @@ def main():
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
     f.close()
-    # f = open('data/'+dataID+'/adj.pkl', 'wb')
-    # pickle.dump(data_adj, f)
-    # f.close()
+    if threshold:
+        data_C = gen_cmtx(data_H)
+        f = open('data/'+dataID+'/cmat.pkl', 'wb')
+        pickle.dump(data_C, f)
+        f.close()
 
 
 if __name__ == '__main__':
