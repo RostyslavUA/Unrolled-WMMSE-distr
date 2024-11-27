@@ -42,7 +42,7 @@ alpha = 1/np.sqrt(2)
 batch_size = 64
 
 # Training iterations
-tr_iter = 10000
+tr_iter = 100
 
 # Testing iterations
 te_iter = 100
@@ -231,7 +231,6 @@ def gen_cmtx(data_H):
             cmtcs.append(cmtx)
         cmtcs = sp.vstack(cmtcs)
         C.append(cmtcs)
-        print(f"{i}/{len(data_H['train_H'])} mini-batch.")
     data_C['train_cmat'] = C
     return data_C
 
