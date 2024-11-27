@@ -32,7 +32,7 @@ optimizer = 'gd'
 # Experiment
 dataID = sys.argv[1]
 exp = sys.argv[2]
-cmat_sparse = False
+cmat_sparse = True
 grad_subsample_p = 0.0
 dropout_op = 0.0
 learning_rate = 1e-3
@@ -49,10 +49,10 @@ if len(sys.argv) > 6:
 if len(sys.argv) > 7:
     max_gradient_norm = float(sys.argv[7])
 # Maximum available power at each node
-Pmax = 1.0
+Pmax = 5.0
 
 # Noise power
-var_db = -91
+var_db = -136.87
 var = 10**(var_db/10)
 
 # Features
@@ -155,6 +155,8 @@ def mainTrain():
                         batch_train_H = train_H[it]
                         if cmat_sparse:
                             batch_train_cmat = train_cmat[it]
+                            batch_train_cmat = batch_train_cmat.toarray()
+                            batch_train_cmat = batch_train_cmat.reshape(batch_size, nNodes, nNodes)
                         else:
                             batch_train_cmat = np.ones_like(batch_train_H)/nNodes  # Averaging
                         batch_train_inputs = (batch_train_H, batch_train_cmat)
