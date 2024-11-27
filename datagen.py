@@ -151,7 +151,7 @@ def generate_data(batch_size, layout, xy_lim, alpha, nNodes, threshold=False, fa
         elif layout == 'square':
             transmitters, receivers = gen_location_square(xy_lim=xy_lim, nNodes=nNodes)
         # Generate dict of coordinates, gain (linear), path loss (dB) and distance matrix
-        coord, h_mtx_lin, h_mtx_db, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
+        coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
         if fading:
             # Apply Rayleigh fading with parameter alpha
             H = sample_graph(batch_size, h_mtx_lin, alpha)
