@@ -14,19 +14,27 @@ np.random.seed(0)
 
 # Eperiment
 dataID = sys.argv[1]
-dataID = 'set'+str(dataID)+'_dynamic'
 
 # Number of nodes
 nNodes = 25
+
+layout = 'circle'
+# circle radius or half of a square's side of a simulated area
+xy_lim = 200
+
+# Thresholding
+threshold = False
+
+# Fading
+fading = False
+
+dataID = 'set'+str(dataID)+f'_UMa_Optional_{layout}_n{nNodes}_lim{xy_lim}_thr{int(threshold)}_fading{int(fading)}'
 
 # Path gain exponent
 pl = 2.2
 
 # Channel
 channel = 'nlos'
-
-# Thresholding
-threshold = True
 
 # Rayleigh (NLOS) or Rician(LOS) distribution scale
 alpha = 1/np.sqrt(2)
@@ -41,8 +49,7 @@ tr_iter = 100
 te_iter = 100
 
 
-def gen_location(xy_lim, nNodes, min_dist=10, nAttempts=100):
-    # Define circle 1km diameter
+def gen_location_circle(xy_lim, nNodes, min_dist=0, nAttempts=100):
     # Generate coordinates for transmitters
     tx_r = np.random.uniform(low=0, high=xy_lim, size=nNodes)
     angle = np.random.uniform(low=0, high=2*np.pi, size=nNodes)
@@ -51,7 +58,7 @@ def gen_location(xy_lim, nNodes, min_dist=10, nAttempts=100):
     transmitters[:, 1] = tx_r*np.sin(angle)
     for i in range(nAttempts):
         # Generate random radius for intended receivers
-        r_vec = np.random.uniform(low=10, high=50, size=nNodes)
+        r_vec = np.random.uniform(low=10, high=100, size=nNodes)
         a_vec = np.random.uniform(low=0, high=360, size=nNodes)
         # Calculate random delta coordinates for intended receivers
         xy_delta = np.zeros_like(transmitters)
@@ -63,7 +70,21 @@ def gen_location(xy_lim, nNodes, min_dist=10, nAttempts=100):
         if i == nAttempts-1:
             raise ValueError(f"Some receivers are closer to transmitters than required min distance {min_dist}m.")
 
-
+            
+def gen_location_square(xy_lim, nNodes):
+    tx_x = np.random.uniform(low=-xy_lim, high=xy_lim, size=nNodes)
+    tx_y = np.random.uniform(low=-xy_lim, high=xy_lim, size=nNodes)
+    transmitters = np.zeros((nNodes, 2))
+    transmitters[:, 0] = tx_x
+    transmitters[:, 1] = tx_y
+    rx_x = np.random.uniform(low=-xy_lim, high=xy_lim, size=nNodes)
+    rx_y = np.random.uniform(low=-xy_lim, high=xy_lim, size=nNodes)
+    receivers = np.zeros((nNodes, 2))
+    receivers[:, 0] = rx_x
+    receivers[:, 1] = rx_y
+    return transmitters, receivers
+            
+    
 def build_adhoc_network(coord, pars, batch_size):
     fc = pars['fc']
     std = pars['std']
@@ -72,13 +93,13 @@ def build_adhoc_network(coord, pars, batch_size):
     d_mtx = distance_matrix(transmitters, receivers)
     pl_no_shadowing = gen_pl_uma_optional(fc, d_mtx)
     nNodes = d_mtx.shape[0]
-    h_mtx_db = np.zeros((batch_size, nNodes, nNodes))
+    pl_mtx_db = np.zeros((batch_size, nNodes, nNodes))
     for b in range(batch_size):
         x_g = np.random.normal(0, std, size=d_mtx.shape)
         x_g = np.clip(x_g, 0-2*std, 0+2*std)
-        h_mtx_db[b, :, :] = pl_no_shadowing + x_g  # 64 instances of path loss with lognormal shadowing for each location realization
-    h_mtx_lin = 10.0 ** (-h_mtx_db/10.0)
-    return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx_lin, h_mtx_db, d_mtx )
+        pl_mtx_db[b, :, :] = pl_no_shadowing + x_g  # 64 instances of path loss with lognormal shadowing for each location realization
+    h_mtx_lin = 10.0 ** (-pl_mtx_db/20.0)  # Divide by 20 to get magnitude coefficients
+    return( dict(zip(['tx', 'rx'],[transmitters, receivers] )), h_mtx_lin, pl_mtx_db, d_mtx )
 
 
 def rician_distribution(batch_size, alpha):
@@ -116,7 +137,7 @@ def gen_threshold():
 
 
 # Training Data
-def generate_data(batch_size, alpha, nNodes, threshold=False):
+def generate_data(batch_size, layout, xy_lim, alpha, nNodes, threshold=False, fading=False):
     pars = {
         "fc": 0.9,  # GHz
         "std": 7.2
@@ -125,25 +146,37 @@ def generate_data(batch_size, alpha, nNodes, threshold=False):
     thr_gain_lin = gen_threshold()
     for indx in range(tr_iter):
         # sample training data
-        transmitters, receivers = gen_location(xy_lim=500, nNodes=nNodes)
+        if layout == 'circle':
+            transmitters, receivers = gen_location_circle(xy_lim=xy_lim, nNodes=nNodes)
+        elif layout == 'square':
+            transmitters, receivers = gen_location_square(xy_lim=xy_lim, nNodes=nNodes)
         # Generate dict of coordinates, gain (linear), path loss (dB) and distance matrix
         coord, h_mtx_lin, h_mtx_db, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
-        # Apply Rayleigh fading with parameter alpha
-        H = sample_graph(batch_size, h_mtx_lin, alpha )
-        # Threshold unintended receivers
+        if fading:
+            # Apply Rayleigh fading with parameter alpha
+            H = sample_graph(batch_size, h_mtx_lin, alpha)
+        else:
+            H = h_mtx_lin
         if threshold:
+            # Threshold receivers
             H[H < thr_gain_lin] = 0.0
         tr_H.append( H )
 
     for indx in range(te_iter):
         # sample test data
-        transmitters, receivers = gen_location(xy_lim=500, nNodes=nNodes)
+        if layout == 'circle':
+            transmitters, receivers = gen_location_circle(xy_lim=xy_lim, nNodes=nNodes)
+        elif layout == 'square':
+            transmitters, receivers = gen_location_square(xy_lim=xy_lim, nNodes=nNodes)
         # Generate dict of coordinates, gain (linear), path loss (dB) and distance matrix
         coord, h_mtx_lin, pl_mtx, d_mtx = build_adhoc_network((transmitters, receivers), pars, batch_size)
-        # Apply Rayleigh fading with parameter alpha
-        H = sample_graph(batch_size, h_mtx_lin, alpha )
-        # Threshold unintended receivers
+        if fading:
+            # Apply Rayleigh fading with parameter alpha
+            H = sample_graph(batch_size, h_mtx_lin, alpha)
+        else:
+            H = h_mtx_lin
         if threshold:
+            # Threshold receivers
             H[H < thr_gain_lin] = 0.0
         te_H.append( H )
 
@@ -248,7 +281,7 @@ def main():
         os.makedirs('data/'+dataID)
 
     # Training data
-    data_H = generate_data(batch_size, alpha, nNodes, threshold)
+    data_H = generate_data(batch_size, layout, xy_lim, alpha, nNodes, threshold, fading)
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
     f.close()
