@@ -47,10 +47,10 @@ if len(sys.argv) > 6:
 if len(sys.argv) > 7:
     max_gradient_norm = float(sys.argv[7])
 # Maximum available power at each node
-Pmax = 1.0
+Pmax = 5.0
 
 # Noise power
-var_db = -91
+var_db = -136.87
 var = 10**(var_db/10)
 
 # Features
@@ -103,19 +103,18 @@ def mainTrain():
             test_iter = len(test_H)
                     
             print( '\nWMMSE Started\n' )
+            print(f"{layers} layers")
 
             t = 0.
             test_rate = 0.0
             sum_rate = []
-            
             for batch in range(test_iter):
                 batch_test_inputs = test_H[batch]                
                 start = time.time()
-                avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs )
+                avg_rate, batch_rate, batch_power, sinr, sinr_num, sinr_den, intf = model.eval( sess, inputs=batch_test_inputs )
                 t += (time.time() - start)
                 test_rate += -avg_rate
                 sum_rate.append( batch_rate )
-                
             test_rate /= test_iter
 
             # Average per-iteration test time
@@ -129,7 +128,6 @@ def mainTrain():
             
             # Create model 
             model = create_model(sess, exp, reg_constant, max_gradient_norm)
-
             if mode == 'train':
                 # Create model path
                 if not os.path.exists('models/'+dataID):
@@ -144,15 +142,13 @@ def mainTrain():
                 for epoch in range(nEpoch):
                     start = time.time()
                     train_rate = 0.0
-                
                     for it in range(train_iter):
                         batch_train_inputs = train_H[it]
-                        step_rate, batch_rate, power = model.train( sess, inputs=batch_train_inputs )
+                        step_rate, batch_rate, power, sinr, sinr_num, sinr_den, intf = model.train(sess, inputs=batch_train_inputs)
                         if np.isnan(step_rate) or np.isinf(step_rate) :
                             pdb.set_trace()
                         train_rate += -step_rate
                     train_rate /= train_iter
-
                     t = 0.
                     test_rate = 0.0
                     sum_rate = []
@@ -160,7 +156,7 @@ def mainTrain():
                     for batch in range(test_iter):
                         batch_test_inputs = test_H[batch]
                         start = time.time()
-                        avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs )
+                        avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs)[:3]
                         if np.isnan(avg_rate) or np.isinf(avg_rate):
                             pdb.set_trace()
                         t += (time.time() - start)
