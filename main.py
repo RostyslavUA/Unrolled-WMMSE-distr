@@ -144,7 +144,7 @@ def mainTrain():
                     train_rate = 0.0
                     for it in range(train_iter):
                         batch_train_inputs = train_H[it]
-                        step_rate, batch_rate, power, sinr, sinr_num, sinr_den, intf = model.train(sess, inputs=batch_train_inputs)
+                        step_rate, batch_rate, power = model.train(sess, inputs=batch_train_inputs)
                         if np.isnan(step_rate) or np.isinf(step_rate) :
                             pdb.set_trace()
                         train_rate += -step_rate
@@ -156,7 +156,7 @@ def mainTrain():
                     for batch in range(test_iter):
                         batch_test_inputs = test_H[batch]
                         start = time.time()
-                        avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs)[:3]
+                        avg_rate, batch_rate, batch_power = model.eval( sess, inputs=batch_test_inputs)
                         if np.isnan(avg_rate) or np.isinf(avg_rate):
                             pdb.set_trace()
                         t += (time.time() - start)

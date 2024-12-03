@@ -640,7 +640,7 @@ class UWMMSE(object):
                             
             outputs = sess.run(output_feed, input_feed)
             
-            return outputs[0], outputs[1], outputs[2], outputs[4], outputs[5], outputs[6], outputs[7]
+            return outputs[0], outputs[1], outputs[2]
 
 
         def eval(self, sess, inputs ):
@@ -657,4 +657,4 @@ class UWMMSE(object):
                            
             outputs = sess.run(output_feed, input_feed)
             
-            return outputs[0], outputs[1], outputs[2], outputs[3], outputs[4], outputs[5], outputs[6]
+            return outputs[0], outputs[1], outputs[2]
