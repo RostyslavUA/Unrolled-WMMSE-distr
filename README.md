@@ -1,8 +1,6 @@
-# DUWMMSE
-Tensorflow implementation of Distributed Unfolding WMMSE using Graph Neural Networks for Efficient Power Allocation TODO: add link to the paper
+# Overview
+Tensorflow implementation of the experiment "Unsupervised Learning for UWMMSE Power Allocation" from the paper "Fully Distributed Online Training of Graph Neural Networks in Networked Systems". TODO: add link to the paper
 
-## Overview
-This library contains a Tensorflow implementation of Distributed Unfolding WMMSE using Graph Neural Networks for Efficient Power Allocation as presented in TODO: add link to the paper.
 ## Dependencies
 
 * **python>=3.6**
@@ -18,13 +16,9 @@ This library contains a Tensorflow implementation of Distributed Unfolding WMMSE
 * [model](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/blob/master/model.py): Defines the DUWMMSE and UWMMSE models.
 * [models](https://github.com/RostyslavUA/Unrolled-WMMSE-distr/tree/master/models): Stores trained models in a folder with same name as \[dataset ID\].
 RostyslavUA
-## Usage
-
-
-Please cite (TODO: add citation) in your work when using this library in your experiments.
 
 ## Feedback
 For questions and comments, feel free to contact [Rostyslav Olshevskyi](mailto:ro22@rice.edu).
 
 ## Citation
-TODO: add
+Please cite (TODO: add citation) in your work when using this library in your experiments.
