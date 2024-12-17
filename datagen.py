@@ -312,21 +312,25 @@ def scatter_channel_gain(d_mtcs, tr_H, n_samp):
     plt.show()
 
 
-
+import scipy.io as sio
 def main():
     # Create data path
     if not os.path.exists('data/'+dataID):
         os.makedirs('data/'+dataID)
     # Training data
     data_H = generate_data(batch_size, layout, xy_lim, alpha, nNodes, threshold, fading)
-    f = open('data/'+dataID+'/H.pkl', 'wb')
-    pickle.dump(data_H, f)
-    f.close()
+    # f = open('data/'+dataID+'/H.pkl', 'wb')
+    # pickle.dump(data_H, f)
+    # f.close()
     sinr_req = 15
     data_conf = gen_conflict_graph(data_H, sinr_req=sinr_req)
-    f = open('data/'+dataID+f'/conf_sinr{sinr_req}.pkl', 'wb')
-    pickle.dump(data_conf, f)
-    f.close()
+    for k, v in data_conf.items():
+        os.makedirs(f'data/{k.split("_")[0]}_conf_{dataID}', exist_ok=True)
+        for i, adj in enumerate(v):
+            adj_resh = adj.toarray().reshape(batch_size, nNodes, nNodes)
+            for adj_b in adj_resh:
+                adj_dict = {'adj': adj_b}
+                sio.savemat(f'data/{k.split("_")[0]}_conf_{dataID}/conf_sinr{sinr_req}_b{i}.mat', adj_dict)
     if threshold:
         data_C = gen_cmtx(data_H)
         f = open('data/'+dataID+'/cmat.pkl', 'wb')
