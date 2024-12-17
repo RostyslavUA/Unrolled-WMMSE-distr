@@ -25,7 +25,7 @@ layout = 'square'
 xy_lim = 500
 
 # Thresholding
-threshold = True
+threshold = False
 
 # Fading
 fading = True
@@ -235,6 +235,32 @@ def gen_cmtx(data_H):
     return data_C
 
 
+def gen_conflict_graph(data_H, sinr_req=5, noise_power=-136.87):
+    data_conf = {}
+    for k, v in data_H.items():
+        conf_graph = []
+        discon_count = 0
+        for H in v:
+            H_diag = np.diagonal(H, axis1=1, axis2=2)
+            sinr_lin = H_diag[:, :, np.newaxis]/(H + 10**(noise_power/10))
+            sinr = 10*np.log10(sinr_lin)
+            adj = np.zeros_like(sinr, dtype=np.float64)
+            adj[sinr < sinr_req] = 1.0
+            adj *= adj.transpose(0, 2, 1)  # symmetric, unweighted
+            adj_sp = []
+            for a in adj:
+                if not nx.is_connected(nx.from_numpy_array(a)):
+                    discon_count += 1
+                    if discon_count/(len(v)*H.shape[0]) > 0.05:
+                        raise ValueError(f"Too many disconnected graphs")
+                a_sp = sp.csr_matrix(a)
+                adj_sp.append(a_sp)
+            adj_sp = sp.vstack(adj_sp)
+            conf_graph.append(adj_sp)
+        data_conf[k.split('_')[0]+'_conf'] = conf_graph
+    return data_conf
+
+
 def lognormal_pathloss(d_mtx, pl0=40, d0=10, gamma=3.0, std=7.0):
     '''
     PL = PL_0 + 10 \gamma \log_{10}\frac{d}{d_0} + X_g
@@ -291,11 +317,15 @@ def main():
     # Create data path
     if not os.path.exists('data/'+dataID):
         os.makedirs('data/'+dataID)
-
     # Training data
     data_H = generate_data(batch_size, layout, xy_lim, alpha, nNodes, threshold, fading)
     f = open('data/'+dataID+'/H.pkl', 'wb')
     pickle.dump(data_H, f)
+    f.close()
+    sinr_req = 15
+    data_conf = gen_conflict_graph(data_H, sinr_req=sinr_req)
+    f = open('data/'+dataID+f'/conf_sinr{sinr_req}.pkl', 'wb')
+    pickle.dump(data_conf, f)
     f.close()
     if threshold:
         data_C = gen_cmtx(data_H)
